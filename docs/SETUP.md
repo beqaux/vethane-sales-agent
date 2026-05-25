@@ -41,7 +41,8 @@
 5. [ ] **Pub/Sub topic** oluştur (örn. `gmail-inbound`).
    - [ ] Topic'e **Publisher** rolü ver: `gmail-api-push@system.gserviceaccount.com` (Gmail'in publish edebilmesi için zorunlu).
    - [ ] `PUBSUB_TOPIC` = tam topic adı (`projects/<proj>/topics/gmail-inbound`).
-6. [ ] **Push subscription** (⏳ ilk Vercel deploy'dan SONRA): endpoint `https://<vercel-app>/api/webhooks/gmail`, **OIDC token** ile kimlik; `PUBSUB_AUDIENCE` = endpoint/audience.
+6. [ ] **Push subscription** (⏳ ilk Vercel deploy'dan SONRA): endpoint `https://<vercel-app>/api/webhooks/gmail?token=<PUBSUB_VERIFICATION_TOKEN>`.
+   - Rastgele token üret: `openssl rand -hex 16` → hem subscription URL'ine `?token=` olarak, hem `.env`'e `PUBSUB_VERIFICATION_TOKEN` olarak koy. Webhook bu token'ı doğrular (v1; OIDC yerine basit + yeterli).
    - (Lokal test için ngrok/Cloudflare Tunnel ile geçici endpoint.)
 
 > `GMAIL_REFRESH_TOKEN` burada DEĞİL — kod yazıldıktan sonra `scripts/setup-gmail-watch.ts` çalıştırınca üretilir (OAuth client bu adımda hazır olmalı).
@@ -102,7 +103,7 @@ kod Step 6 (setup-gmail-watch) ──► GMAIL_REFRESH_TOKEN  (OAuth client 2.4 
 | GMAIL_REFRESH_TOKEN | kod Step 6 (setup script) |
 | SENDER_EMAIL / NAME | 1 |
 | PUBSUB_TOPIC | 2.5 |
-| PUBSUB_AUDIENCE | 2.6 (deploy sonrası) |
+| PUBSUB_VERIFICATION_TOKEN | 2.6 (deploy sonrası; ?token= ile eşleşir) |
 | TELEGRAM_BOT_TOKEN / CHAT_ID | 5 |
 | GOOGLE_PLACES_API_KEY | 6 |
 | CRON_SECRET | 8 |
