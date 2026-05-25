@@ -1,0 +1,43 @@
+import { describe, it, expect } from "vitest";
+import { deriveSegment, deriveTier } from "@/lib/util/segment";
+
+describe("deriveSegment", () => {
+  it("vet sayısından türetir", () => {
+    expect(deriveSegment(6, "hastane")).toBe("hospital");
+    expect(deriveSegment(8, null)).toBe("hospital");
+    expect(deriveSegment(4, "poliklinik")).toBe("mid");
+    expect(deriveSegment(3, "muayenehane")).toBe("mid");
+    expect(deriveSegment(2, "muayenehane")).toBe("solo");
+    expect(deriveSegment(1, null)).toBe("solo");
+  });
+
+  it("vet yoksa türden türetir", () => {
+    expect(deriveSegment(null, "hastane")).toBe("hospital");
+    expect(deriveSegment(null, "poliklinik")).toBe("mid");
+    expect(deriveSegment(null, "muayenehane")).toBe("solo");
+  });
+
+  it("ikisi de yoksa unknown", () => {
+    expect(deriveSegment(null, null)).toBe("unknown");
+    expect(deriveSegment(0, null)).toBe("unknown");
+  });
+});
+
+describe("deriveTier", () => {
+  it("kurumsal (poliklinik/hastane) → Tier 1", () => {
+    expect(deriveTier("hospital", "hastane")).toBe(1);
+    expect(deriveTier("mid", "poliklinik")).toBe(1);
+  });
+
+  it("muayenehane → 3 vet Tier 2, solo Tier 3", () => {
+    expect(deriveTier("mid", "muayenehane")).toBe(2);
+    expect(deriveTier("solo", "muayenehane")).toBe(3);
+  });
+
+  it("tür bilinmiyorsa segmentten (kurumsal varsayar)", () => {
+    expect(deriveTier("hospital", null)).toBe(1);
+    expect(deriveTier("mid", null)).toBe(1);
+    expect(deriveTier("solo", null)).toBe(3);
+    expect(deriveTier("unknown", null)).toBe(3);
+  });
+});

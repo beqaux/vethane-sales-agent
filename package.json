@@ -1,0 +1,51 @@
+{
+  "name": "saas-seller",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vethane Satış Ajanı — çift-modlu, insan-onaylı AI satış ajanı",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@ai-sdk/gateway": "^3.0.120",
+    "@neondatabase/serverless": "^1.1.0",
+    "ai": "^6.0.191",
+    "cheerio": "^1.2.0",
+    "drizzle-orm": "^0.45.2",
+    "googleapis": "^172.0.0",
+    "grammy": "^1.43.0",
+    "next": "^16.2.6",
+    "papaparse": "^5.5.3",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "@next/eslint-plugin-next": "^16.2.6",
+    "@types/node": "^25.9.1",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.6",
+    "prettier": "^3.8.3",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.0",
+    "vitest": "^4.1.7"
+  }
+}

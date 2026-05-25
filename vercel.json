@@ -1,0 +1,7 @@
+{
+  "crons": [
+    { "path": "/api/cron/outbound", "schedule": "0 * * * *" },
+    { "path": "/api/cron/watch-renew", "schedule": "0 6 */6 * *" },
+    { "path": "/api/cron/poll-sent", "schedule": "*/10 * * * *" }
+  ]
+}

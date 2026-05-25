@@ -1,0 +1,27 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# env (gerçek secrets — asla commit'leme)
+.env
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# misc
+.DS_Store
+*.log
+/coverage
