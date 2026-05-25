@@ -87,8 +87,10 @@ export interface ReplyPlan {
   action: ActionType;
   goal: string;
   guidance: string;
-  notify: boolean; // hot signal?
+  sendDraft: boolean; // yanıt taslağı üretilsin mi? (ilgisiz/oto_yanit → false)
+  notify: boolean; // hot signal → Telegram?
   stopSequence: boolean;
+  rescheduleDays?: number; // oto_yanit (OOO) → sekansı ertele
   suppress: boolean;
   newDurum?: LeadDurum;
   includePrice?: boolean;

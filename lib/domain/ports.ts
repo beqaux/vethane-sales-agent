@@ -4,8 +4,16 @@ import type {
   Message,
   InboundMessage,
   DraftRequest,
+  Candidate,
 } from "./types";
-import type { Classification, LeadDurum, Segment, SuppReason } from "./enums";
+import type {
+  Classification,
+  LeadDurum,
+  Segment,
+  SuppReason,
+  Tier,
+  EmailConfidence,
+} from "./enums";
 
 // --- Dış servis portları (Adapter pattern, IMPL §2.1) ---
 
@@ -15,9 +23,9 @@ export interface EmailProvider {
     to: string,
     subject: string,
     body: string,
-  ): Promise<string>; // draftId
+  ): Promise<{ id: string; threadId: string | null }>;
   send(draftId: string): Promise<string>; // messageId
-  listHistory(startHistoryId: string): Promise<InboundMessage[]>;
+  listRecentInbound(maxResults?: number): Promise<InboundMessage[]>;
   addLabel(threadId: string, label: string): Promise<void>;
   watch(): Promise<{ historyId: string; expiration: number }>;
 }
@@ -31,6 +39,10 @@ export interface AiPort {
 
 export interface NotifyPort {
   notify(text: string): Promise<void>;
+}
+
+export interface PlacesPort {
+  searchClinics(query: string, opts?: { city?: string }): Promise<Candidate[]>;
 }
 
 // --- Repository portları ---
@@ -47,6 +59,11 @@ export interface LeadRepo {
   upsertByEmail(lead: Partial<Lead> & { email: string }): Promise<Lead>;
   updateDurum(id: string, durum: LeadDurum): Promise<void>;
   setThread(id: string, threadId: string): Promise<void>;
+  upsertCandidate(
+    c: Candidate & { segment: Segment; tier: Tier; email?: string | null },
+  ): Promise<Lead>;
+  listByDurum(durum: LeadDurum, limit?: number): Promise<Lead[]>;
+  setEmail(id: string, email: string, confidence: EmailConfidence): Promise<void>;
 }
 
 export interface SequenceRepo {
@@ -57,6 +74,7 @@ export interface SequenceRepo {
 
 export interface MessageRepo {
   add(msg: Omit<Message, "id" | "createdAt">): Promise<Message>;
+  existsInbound(gmailMessageId: string): Promise<boolean>;
 }
 
 export interface SuppressionRepo {
