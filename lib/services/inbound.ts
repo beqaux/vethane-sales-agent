@@ -151,13 +151,14 @@ export function createInboundService(deps: InboundDeps) {
       if (!g.ok) {
         await deps.events.log("guardrail_block", lead.id, { reason: g.reason, action: plan.action });
       } else {
+        const replyThread = msg.threadId || lead.gmailThreadId;
         const created = await deps.mail.createDraft(
-          lead.gmailThreadId ?? msg.threadId,
+          replyThread,
           toEmail,
           draft.subject,
           draft.body,
         );
-        if (created.threadId && !lead.gmailThreadId) {
+        if (created.threadId && created.threadId !== lead.gmailThreadId) {
           await deps.leads.setThread(lead.id, created.threadId);
         }
         const auto = ACTION_MODES[plan.action] === "auto" && cls.confidence >= CONF_THRESHOLD;
