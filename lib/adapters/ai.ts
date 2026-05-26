@@ -7,11 +7,11 @@ import { ClassificationSchema } from "../domain/schemas";
 import { buildSystemPrompt, buildUserPrompt } from "../ai/prompts";
 import type { AiPort } from "../domain/ports";
 
-// Tek provider: Anthropic Claude Haiku 4.5 (Ocak 2026, Türkçe iyi).
-// draft + classify aynı model — operasyonel basit, tek API key (ANTHROPIC_API_KEY).
-// Gemini "project denied access" hatası sonrası geçildi.
+// Hibrit: draft Sonnet 4.6 (kaliteli Türkçe + reasoning), classify Haiku 4.5 (hızlı/ucuz/structured).
+// Haiku draft testi: sayı uydurma + yapay Türkçe ("Handaki", "Tüm sistem harika") → upgrade.
+// Tek API key (ANTHROPIC_API_KEY) — sadece model string değişti.
 export const MODELS = {
-  draft: anthropic("claude-haiku-4-5"),
+  draft: anthropic("claude-sonnet-4-6"),
   classify: anthropic("claude-haiku-4-5"),
 } as const;
 
@@ -31,7 +31,10 @@ Sınıflar:
 - satis_spami: Vethane veteriner bağlamı dışında başka bir ürün/servis pazarlayan cold mail
   (ör. başka SaaS demo daveti, ajans pitch, backlink takası). Lead'le ilgili DEĞİL.
 confidence: 0-1 güven. segmentGuess: imza/içerikten klinik büyüklüğü tahmini (varsa).
-vetCountGuess: mesajda veteriner sayısı açıkça yazıyorsa o sayı (örn. "4 veterinerimiz var" → 4). Yazmıyorsa boş bırak.`;
+vetCountGuess: mesajda veteriner sayısı açıkça yazıyorsa o sayı (örn. "4 veterinerimiz var" → 4).
+  ÖNEMLİ: Önceki Vethane mesajı "Kaç veteriner ile çalıştığınızı öğrenebilir miyim?" sorduysa ve
+  müşteri sadece bir sayı yazdıysa ("3", "4 vet", "5 kişi" gibi) → o sayı vetCountGuess'tir.
+  Yazmıyorsa boş bırak.`;
 
 export const aiAdapter: AiPort = {
   async writeDraft(req) {
