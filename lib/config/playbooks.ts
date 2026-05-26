@@ -40,11 +40,14 @@ export const PLAYBOOKS = {
       guidance: "Kısa, değer odaklı, demo CTA. Sayı yazma.",
     },
     reply: {
-      goal: "Cevaba göre 2-adımlı satışa yönlendir (önce demo, sonra teklif). FİYAT YOK.",
+      goal: "Demoya yönlendir, açık tarih/saat sor. FİYAT YOK.",
       guidance:
-        "Fiyat sorulursa: 'Klinik büyüklüğüne göre değişiyor. 20 dk'lık bir demoda sistemi göstereyim; " +
-        "ardından, ne kadar arka-ofis yükünüz olduğunu birlikte gözden geçirip teklifi ayrı bir görüşmede sunarım.' " +
-        `İlk demoda harcama sorma/teklif verme; o ayrı bir görüşme. Keşif sorusu: "${DISCOVERY_QUESTION}"`,
+        "Açık ve net ol. Şu yapıyı kullan: " +
+        "(1) Kısa selam. " +
+        "(2) Bir cümleyle Vethane'in arka-ofis değerini hatırlat (muhasebe, bordro, vardiya, raporlama tek sistemde). " +
+        "(3) Net çağrı: 'Hangi tarihlerde online bir görüşme yapabiliriz, size demo hesabını gösterelim?' " +
+        "ASLA önceki yanıtlardan özür dileme veya 'fiyat paylaşmışız' diye geri çekme. Mevcut konuşmayı doğal devam ettir. " +
+        "Fiyat sorulursa sayı verme; demoya yönlendir.",
     },
   },
   hospital: {
@@ -54,11 +57,14 @@ export const PLAYBOOKS = {
     },
     takip: { goal: "Kurumsal takip; demo daveti.", guidance: "Kısa, ölçek değeri, demo CTA. Sayı yok." },
     reply: {
-      goal: "2-adımlı satışa yönlendir (demo → ayrı teklif görüşmesi). FİYAT YOK.",
+      goal: "Demoya yönlendir, açık tarih/saat sor. FİYAT YOK.",
       guidance:
-        "Fiyat sorulursa demoya yönlendir, sayı verme. Demo = sistem gösterimi; teklif demo SONRASI " +
-        "ayrı görüşmede. " +
-        `Keşif: "${DISCOVERY_QUESTION}"`,
+        "Kurumsal ama net ton. Yapı: " +
+        "(1) Kısa selam. " +
+        "(2) Bir cümleyle Vethane'in ölçek değeri (çok şube/personel için konsolide arka-ofis). " +
+        "(3) Net çağrı: 'Hangi tarihlerde online bir görüşme yapabiliriz, size demo hesabını gösterelim?' " +
+        "ASLA önceki yanıtlardan özür dileme veya 'fiyat paylaşmışız' diye geri çekme. " +
+        "Fiyat sorulursa sayı verme; demoya yönlendir.",
     },
   },
   demoReply: {
