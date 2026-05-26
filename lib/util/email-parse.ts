@@ -48,3 +48,24 @@ function stripHtml(s: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+export const FREE_MAIL_DOMAINS = new Set([
+  "gmail.com", "googlemail.com",
+  "hotmail.com", "hotmail.com.tr", "outlook.com", "outlook.com.tr",
+  "live.com", "windowslive.com", "msn.com",
+  "yahoo.com", "yahoo.com.tr", "ymail.com",
+  "icloud.com", "me.com", "mac.com",
+  "mynet.com", "mynet.com.tr",
+  "aol.com",
+  "protonmail.com", "proton.me",
+]);
+
+export function emailDomain(email: string): string | null {
+  const idx = email.indexOf("@");
+  if (idx < 0) return null;
+  return email.slice(idx + 1).toLowerCase();
+}
+
+export function isFreeMailDomain(domain: string): boolean {
+  return FREE_MAIL_DOMAINS.has(domain.toLowerCase());
+}

@@ -22,6 +22,7 @@ function makeLead(segment: Segment = "mid"): Lead {
     kaynak: null,
     durum: "sekansta",
     gmailThreadId: "t1",
+    alternateEmails: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -49,11 +50,15 @@ function makeDeps(opts: {
     leads: {
       byThread: vi.fn().mockResolvedValue(lead),
       byEmail: vi.fn().mockResolvedValue(lead),
+      byDomain: vi.fn().mockResolvedValue(null),
+      addAlternateEmail: vi.fn().mockResolvedValue(undefined),
       updateDurum: vi.fn().mockResolvedValue(undefined),
       setThread: vi.fn().mockResolvedValue(undefined),
       dueForSend: vi.fn(),
       byId: vi.fn(),
-      upsertByEmail: vi.fn(),
+      upsertByEmail: vi
+        .fn()
+        .mockResolvedValue(makeLead(opts.segment ?? "mid")),
     },
     seq: {
       get: vi.fn().mockResolvedValue({
@@ -143,14 +148,14 @@ describe("InboundService.handle", () => {
     expect(deps.mail.createDraft).not.toHaveBeenCalled();
   });
 
-  it("lead yoksa → inbound_no_lead, taslak yok", async () => {
+  it("lead yoksa → yeni lead yaratılır + inbound_new_lead event", async () => {
     const deps = makeDeps({ cls: "demo", lead: null });
     await run(deps);
+    expect(deps.leads.upsertByEmail).toHaveBeenCalled();
     expect(deps.events.log).toHaveBeenCalledWith(
-      "inbound_no_lead",
-      null,
+      "inbound_new_lead",
+      expect.any(String),
       expect.objectContaining({ from: "a@b.com" }),
     );
-    expect(deps.mail.createDraft).not.toHaveBeenCalled();
   });
 });

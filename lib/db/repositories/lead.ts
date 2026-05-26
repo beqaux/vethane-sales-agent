@@ -1,4 +1,4 @@
-import { and, eq, lte, inArray, isNotNull, asc } from "drizzle-orm";
+import { and, eq, lte, inArray, isNotNull, asc, sql } from "drizzle-orm";
 import { db } from "../client";
 import { leads, sequenceState } from "../schema";
 import { toLead, toSeq } from "../mappers";
@@ -132,6 +132,36 @@ export const leadRepo: LeadRepo = {
     await db
       .update(leads)
       .set({ email: norm(email), emailConfidence: confidence, updatedAt: new Date() })
+      .where(eq(leads.id, id));
+  },
+
+  async byDomain(domain) {
+    const d = domain.toLowerCase();
+    const rows = await db
+      .select()
+      .from(leads)
+      .where(
+        sql`(${leads.email} LIKE ${"%@" + d})
+            OR EXISTS (
+              SELECT 1 FROM unnest(${leads.alternateEmails}) AS ae
+              WHERE ae LIKE ${"%@" + d}
+            )`,
+      )
+      .limit(1);
+    return rows[0] ? toLead(rows[0]) : null;
+  },
+
+  async addAlternateEmail(id, email) {
+    const e = norm(email);
+    await db
+      .update(leads)
+      .set({
+        alternateEmails: sql`CASE
+          WHEN ${e} = ANY(${leads.alternateEmails}) THEN ${leads.alternateEmails}
+          ELSE array_append(${leads.alternateEmails}, ${e})
+        END`,
+        updatedAt: new Date(),
+      })
       .where(eq(leads.id, id));
   },
 } satisfies LeadRepo;

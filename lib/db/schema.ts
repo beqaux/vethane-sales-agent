@@ -36,6 +36,7 @@ export const leads = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     kurumAdi: text("kurum_adi").notNull(),
+    alternateEmails: text("alternate_emails").array().notNull().default([]),
     sehir: text("sehir"),
     tur: kurumTurEnum("tur"),
     vetSayisi: integer("vet_sayisi"),

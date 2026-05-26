@@ -22,6 +22,7 @@ function lead(segment: Segment): Lead {
     kaynak: null,
     durum: "sekansta",
     gmailThreadId: null,
+    alternateEmails: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   };
