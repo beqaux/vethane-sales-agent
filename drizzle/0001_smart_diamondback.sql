@@ -1,0 +1,1 @@
+ALTER TABLE "leads" ADD COLUMN "alternate_emails" text[] DEFAULT '{}' NOT NULL;

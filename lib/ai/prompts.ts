@@ -21,7 +21,7 @@ export function buildSystemPrompt(req: DraftRequest): string {
   }
   if (req.segment === "mid" || req.segment === "hospital") {
     parts.push(
-      `- ${PRICE_BAN_MARKER}: Bu segmentte değer-satışı yapılır. E-postada KESİNLİKLE fiyat, rakam, ücret veya para birimi (₺ / TL) GEÇMESİN. Fiyat sorulursa "klinik büyüklüğüne göre değişiyor, kısa bir demoda net teklif veririm" de.`,
+      `- ${PRICE_BAN_MARKER}: Bu segmentte değer-satışı yapılır. E-postada KESİNLİKLE fiyat, rakam, ücret veya para birimi (₺ / TL) GEÇMESİN. Fiyat sorulursa 2-adımlı satışa yönlendir: "Klinik büyüklüğüne göre değişiyor; 20 dk'lık bir demoda sistemi göstereyim, teklifi ardından ayrı bir görüşmede sunarım."`,
     );
   } else {
     parts.push(

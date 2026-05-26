@@ -32,6 +32,7 @@ export interface Lead {
   kaynak: string | null;
   durum: LeadDurum;
   gmailThreadId: string | null;
+  alternateEmails: string[];
   createdAt: Date;
   updatedAt: Date;
 }

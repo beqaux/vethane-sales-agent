@@ -26,6 +26,7 @@ const lead: Lead = {
   kaynak: null,
   durum: "yeni",
   gmailThreadId: "t1",
+  alternateEmails: [],
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -58,6 +59,8 @@ const leads = {
   upsertCandidate: async () => ({ ...lead }),
   listByDurum: async () => [],
   setEmail: async () => {},
+  byDomain: async () => null,
+  addAlternateEmail: async () => {},
 };
 
 const seq = {
