@@ -171,4 +171,15 @@ describe("InboundService.handle", () => {
     expect(deps.mail.send).not.toHaveBeenCalled();
     expect(deps.notify.hot).toHaveBeenCalled();
   });
+
+  it("notify.hot çağrısı zengin enrichment içerir (cls)", async () => {
+    const deps = makeDeps({ cls: "demo", segment: "mid", confidence: 0.9 });
+    await run(deps);
+    expect(deps.notify.hot).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      expect.any(Object),
+      expect.objectContaining({ cls: expect.objectContaining({ cls: "demo" }) }),
+    );
+  });
 });

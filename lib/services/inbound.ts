@@ -1,9 +1,10 @@
-import { playbookFor } from "../playbooks";
+import { playbookFor, detectPremiumSignal } from "../playbooks";
 import { getKnowledge } from "../ai/knowledge";
 import { runGuardrails } from "../guardrails";
 import { onReply, onOptout, reschedule } from "./sequence";
 import { ACTION_MODES } from "../config/runtime";
 import { emailDomain, isFreeMailDomain } from "../util/email-parse";
+import type { NotifyEnrichment } from "./notify";
 import type {
   LeadRepo,
   SequenceRepo,
@@ -70,7 +71,7 @@ export function createInboundService(deps: InboundDeps) {
           kaynak: "inbound",
         });
         await deps.events.log("inbound_new_lead", lead.id, { from: msg.fromEmail, cls: cls.cls });
-        await deps.notify.hot(`🆕 Web inbound — ${cls.cls}`, lead, msg);
+        await deps.notify.hot(`🆕 Web inbound — ${cls.cls}`, lead, msg, { cls });
       }
     }
 
@@ -98,7 +99,7 @@ export function createInboundService(deps: InboundDeps) {
     }
 
     if (cls.confidence < CONF_THRESHOLD) {
-      await deps.notify.hot("❓ Belirsiz cevap — elle bak", lead, msg);
+      await deps.notify.hot("❓ Belirsiz cevap — elle bak", lead, msg, { cls });
     }
 
     if (plan.suppress) await deps.supp.add(lead.email ?? msg.fromEmail, "optout");
@@ -114,7 +115,12 @@ export function createInboundService(deps: InboundDeps) {
 
     if (plan.notify) {
       const label = cls.cls === "demo" ? "🔥 DEMO İSTEĞİ" : "🔥 Premium/ilgili yanıt";
-      await deps.notify.hot(label, lead, msg);
+      const enrich: NotifyEnrichment = {
+        cls,
+        premiumMatch:
+          segment === "unknown" ? detectPremiumSignal({ lead, msg, cls }) : undefined,
+      };
+      await deps.notify.hot(label, lead, msg, enrich);
     }
 
     if (plan.sendDraft) {
