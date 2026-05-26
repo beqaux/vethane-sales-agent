@@ -158,4 +158,17 @@ describe("InboundService.handle", () => {
       expect.objectContaining({ from: "a@b.com" }),
     );
   });
+
+  it("düşük confidence (<0.5) → auto-mode bypass, mail.send çağrılmaz", async () => {
+    const deps = makeDeps({
+      cls: "fiyat",
+      confidence: 0.3,
+      segment: "solo",
+      aiBody: "Aylık taban 1.950 ₺ + KDV...",
+    });
+    await run(deps);
+    expect(deps.mail.createDraft).toHaveBeenCalled();
+    expect(deps.mail.send).not.toHaveBeenCalled();
+    expect(deps.notify.hot).toHaveBeenCalled();
+  });
 });
