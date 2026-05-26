@@ -64,6 +64,8 @@ export interface LeadRepo {
   ): Promise<Lead>;
   listByDurum(durum: LeadDurum, limit?: number): Promise<Lead[]>;
   setEmail(id: string, email: string, confidence: EmailConfidence): Promise<void>;
+  byDomain(domain: string): Promise<Lead | null>;
+  addAlternateEmail(id: string, email: string): Promise<void>;
 }
 
 export interface SequenceRepo {

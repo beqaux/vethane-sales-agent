@@ -3,6 +3,7 @@ import { getKnowledge } from "../ai/knowledge";
 import { runGuardrails } from "../guardrails";
 import { onReply, onOptout, reschedule } from "./sequence";
 import { ACTION_MODES } from "../config/runtime";
+import { emailDomain, isFreeMailDomain } from "../util/email-parse";
 import type {
   LeadRepo,
   SequenceRepo,
@@ -45,16 +46,32 @@ export function createInboundService(deps: InboundDeps) {
       (await deps.leads.byEmail(msg.fromEmail));
 
     if (!lead) {
-      // Web sitesinden direkt inbound (outbound'umuza cevap DEĞİL) — lead'i otomatik oluştur, kurucuyu bilgilendir.
-      lead = await deps.leads.upsertByEmail({
-        email: msg.fromEmail,
-        kurumAdi: `Web inbound — ${msg.fromEmail}`,
-        segment: "unknown",
-        durum: "yeni",
-        kaynak: "inbound",
-      });
-      await deps.events.log("inbound_new_lead", lead.id, { from: msg.fromEmail, cls: cls.cls });
-      await deps.notify.hot(`🆕 Web inbound — ${cls.cls}`, lead, msg);
+      const domain = emailDomain(msg.fromEmail);
+      if (domain && !isFreeMailDomain(domain)) {
+        const existing = await deps.leads.byDomain(domain);
+        if (existing) {
+          await deps.leads.addAlternateEmail(existing.id, msg.fromEmail);
+          lead = {
+            ...existing,
+            alternateEmails: [...existing.alternateEmails, msg.fromEmail.toLowerCase()],
+          };
+          await deps.events.log("inbound_lead_merged", lead.id, {
+            from: msg.fromEmail,
+            matchedDomain: domain,
+          });
+        }
+      }
+      if (!lead) {
+        lead = await deps.leads.upsertByEmail({
+          email: msg.fromEmail,
+          kurumAdi: `Web inbound — ${msg.fromEmail}`,
+          segment: "unknown",
+          durum: "yeni",
+          kaynak: "inbound",
+        });
+        await deps.events.log("inbound_new_lead", lead.id, { from: msg.fromEmail, cls: cls.cls });
+        await deps.notify.hot(`🆕 Web inbound — ${cls.cls}`, lead, msg);
+      }
     }
 
     await deps.msgs.add({

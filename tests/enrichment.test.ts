@@ -27,6 +27,7 @@ function makeLead(over: Partial<Lead> = {}): Lead {
     kaynak: "places",
     durum: "aday",
     gmailThreadId: null,
+    alternateEmails: [],
     createdAt: new Date(),
     updatedAt: new Date(),
     ...over,
