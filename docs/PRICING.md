@@ -2,6 +2,8 @@
 
 > **Durum:** Karara bağlandı (grill-with-docs, 2026-05-24). Sayılar tunable; **model** sabit (bkz. [`ADR-0004`](../adr/0004-deger-bazli-buyukluk-kademeli-fiyat.md)).
 > **Sürüm:** v3.2 (2026-05-25) — solo (1-2) +%31 korundu; **mid/hastane cerrahi kısıldı** → capture %26-54 → **%23-47** (mid %54→%46), eğri yine dik (değer-tiering korundu). v3.1 (2026-05-24) tüm bantları ×1,31 yapmıştı. **Model sabit** (ADR-0004); v3 temeli: fiyat rakip lisansına değil **arka-ofis maliyetine** demirli, büyüklüğe kademeli (v1/v2 SUPERSEDED).
+> v3.3 (2026-05-26) — §10 satış akışı 2-adımlı (demo → ayrı teklif görüşmesi) olarak güncellendi
+> ([ADR-0005](../adr/0005-demo-sistem-gosterimi-iki-adimli-satis.md)). Fiyat seviyeleri değişmedi.
 > **Kapsam:** Fiyat seviyeleri. Paketleme & gelir modeli kilitli: [`CONTEXT.md`](../../CONTEXT.md), [`ADR-0001`](../adr/0001-modul-paketleme-ve-gelir-modeli.md). Konumlandırma: [`ADR-0003`](../adr/0003-konumlandirma-veteriner-isletme-yonetimi.md). Fiyat modeli: [`ADR-0004`](../adr/0004-deger-bazli-buyukluk-kademeli-fiyat.md).
 > **Para birimi:** ₺, **KDV hariç** (B2B; faturada %20 eklenir, klinik indirir).
 > **İş hedefi:** Geliri **2 kurucu** paylaşır → viability 2 maaşa göre (§3).
@@ -216,7 +218,19 @@ Kalan ikincil kararlar en iyi pratiğe göre sabitlendi (model sabit, sayılar t
 | **Fiyat gösterimi** | Solo tier sitede açık; mid/hastane "Teklif Al" | Funnel + güven (solo) + değer-satışı (büyük) |
 | **Tahsilat** | Aylık kart (iyzico/PayTR) + yıllık peşin havale | TR'de standart recurring B2B SaaS tahsilatı |
 
-**Satış akışı (mid/hastane):** demo → *"bugün muhasebeci + bordro + raporlamaya ne harcıyorsunuz?"* (≈ §4.1 arka-ofis maliyeti, ₺25-90k) → Vethane tek sistemde + fraksiyonuna → büyüklük bandına göre teklif.
+**Satış akışı (mid/hastane), 2-adımlı:**
+
+**Adım 1 — Demo (sistem gösterimi):** Klinik isteyince, AI ajan demo zamanı önerir ve kurucuya
+Telegram bildirir. Demo = fake-data ürün-tour'u (modüller, ekranlar, akış). **Demoda harcama
+sorusu ve teklif YOKTUR.** Demo bitiminde kurucu, klinikten "teklif görüşmesi" için ayrı bir
+takvim slot'u talep eder.
+
+**Adım 2 — Teklif görüşmesi (kurucu manuel):** *"Bugün muhasebeci + bordro + vardiya +
+raporlamaya ne harcıyorsunuz?"* (≈ §4.1 arka-ofis maliyeti, ₺25-90k) → Vethane tek sistemde +
+fraksiyonuna → klinik büyüklük bandına göre teklif.
+
+Bu ayrım [ADR-0005](../adr/0005-demo-sistem-gosterimi-iki-adimli-satis.md) ile kararlaştırıldı.
+Demo sürtünmesini düşürür (daha çok demo bookings); teklif görüşmesi nitelikli müşteriyle yapılır.
 
 **İlk 3-5 müşteri:** indirimli/uzun-trial referans pilotu → memnuniyet referansı + Faz-2 benchmarking verisi + ürün geri bildirimi. Klinik #1'e tam liste fiyatı dayatma.
 
