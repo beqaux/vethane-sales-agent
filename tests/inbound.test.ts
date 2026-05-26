@@ -35,6 +35,7 @@ const msg: InboundMessage = {
   subject: "Konu",
   body: "merhaba",
   receivedAt: new Date(),
+  headerMessageId: "<msg-1@gmail.com>",
 };
 
 function makeDeps(opts: {
@@ -44,6 +45,7 @@ function makeDeps(opts: {
   segment?: Segment;
   lead?: Lead | null;
   existsInbound?: boolean;
+  vetCountGuess?: number;
 }) {
   const lead = opts.lead === undefined ? makeLead(opts.segment ?? "mid") : opts.lead;
   return {
@@ -52,6 +54,7 @@ function makeDeps(opts: {
       byEmail: vi.fn().mockResolvedValue(lead),
       byDomain: vi.fn().mockResolvedValue(null),
       addAlternateEmail: vi.fn().mockResolvedValue(undefined),
+      updateVetCount: vi.fn().mockResolvedValue(undefined),
       updateDurum: vi.fn().mockResolvedValue(undefined),
       setThread: vi.fn().mockResolvedValue(undefined),
       dueForSend: vi.fn(),
@@ -85,7 +88,11 @@ function makeDeps(opts: {
       watch: vi.fn(),
     },
     ai: {
-      classify: vi.fn().mockResolvedValue({ cls: opts.cls, confidence: opts.confidence ?? 0.9 }),
+      classify: vi.fn().mockResolvedValue({
+        cls: opts.cls,
+        confidence: opts.confidence ?? 0.9,
+        vetCountGuess: opts.vetCountGuess,
+      }),
       writeDraft: vi.fn().mockResolvedValue({ subject: "Re", body: opts.aiBody ?? "yanıt" }),
     },
     notify: { hot: vi.fn().mockResolvedValue(undefined) },
@@ -180,6 +187,37 @@ describe("InboundService.handle", () => {
       expect.any(Object),
       expect.any(Object),
       expect.objectContaining({ cls: expect.objectContaining({ cls: "demo" }) }),
+    );
+  });
+
+  it("AI vetCountGuess gelirse lead.vetSayisi güncellenir + segment recalculate edilir", async () => {
+    // Lead solo segmentinde başlasın; AI 4 vet bildirsin → segment mid'e geçmeli.
+    const deps = makeDeps({ cls: "ilgili", segment: "solo", vetCountGuess: 4 });
+    await run(deps);
+    expect(deps.leads.updateVetCount).toHaveBeenCalledWith("1", 4, "mid", expect.any(Number));
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "lead_segment_updated",
+      "1",
+      expect.objectContaining({ from: "solo", to: "mid", vetSayisi: 4 }),
+    );
+  });
+
+  it("AI vetCountGuess mevcut vetSayisi ile aynıysa update YAPILMAZ", async () => {
+    const deps = makeDeps({ cls: "ilgili", segment: "mid", vetCountGuess: 4 });
+    // makeLead("mid") vetSayisi=4 dönüyor.
+    await run(deps);
+    expect(deps.leads.updateVetCount).not.toHaveBeenCalled();
+  });
+
+  it("reply taslağı createDraft'a msg.headerMessageId geçer (In-Reply-To için)", async () => {
+    const deps = makeDeps({ cls: "demo", segment: "mid" });
+    await run(deps);
+    expect(deps.mail.createDraft).toHaveBeenCalledWith(
+      "t1",
+      "a@b.com",
+      "Re: Konu",
+      expect.any(String),
+      "<msg-1@gmail.com>",
     );
   });
 });

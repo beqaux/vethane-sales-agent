@@ -7,13 +7,18 @@ export const DISCOVERY_QUESTION =
 export const PLAYBOOKS = {
   solo: {
     cold: {
-      goal: "Solo kliniği Vethane'in değerini anlatıp ücretsiz denemeye yönlendir.",
+      goal: "Solo kliniği Vethane'in değerini anlatıp kısa bir demoya yönlendir.",
       guidance:
-        "Kısa, samimi, tek bir net fayda. Vethane'i 'işletme yönetimi' olarak konumla (klinik yazılımının yerine değil, yanında). Denemeye davet et. Fiyat sorulmadıkça verme; sorulursa config'ten gelen açık fiyatı kullan.",
+        "Kısa, samimi, tek bir net fayda. Vethane'i 'işletme yönetimi' olarak konumla (klinik yazılımının yerine değil, yanında). " +
+        "Kısa bir demoya davet et: '20 dk'lık bir demoda size gösterelim'. " +
+        "ASLA 'self-servis', 'kendi başınıza deneyin', 'platform/deneme linki' gibi ifadeler kullanma. " +
+        "Fiyat sorulmadıkça verme; sorulursa config'ten gelen açık fiyatı kullan.",
     },
     takip: {
       goal: "Nazik takip; farklı bir açıdan değer hatırlat.",
-      guidance: "Israrcı olma. 1 cümle yeni değer + 'denemek ister misiniz?'.",
+      guidance:
+        "Israrcı olma. 1 cümle yeni değer + 'kısa bir demoda gösterelim mi?'. " +
+        "ASLA 'self-servis' veya 'kendi başınıza deneyin' deme.",
     },
     fiyatReply: {
       goal: "Açık fiyatı ver + vet sayısı sor.",

@@ -120,6 +120,8 @@ export interface InboundMessage {
   subject: string;
   body: string; // düz metin
   receivedAt: Date;
+  /** RFC 5322 Message-ID header — In-Reply-To/References için. */
+  headerMessageId: string | null;
 }
 
 // --- Guardrail ---
