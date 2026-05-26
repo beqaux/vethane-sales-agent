@@ -20,10 +20,9 @@ function soloPriceText(lead: Lead): string {
     const ex = getSoloPrice({ modules: ["muhasebe"], vetCount: vet });
     return `Aylık taban ${taban}. ${vet} vet + Muhasebe modülü ≈ ${formatTRY(ex.total)}. Eklenen modüllere göre değişir. KDV hariç.`;
   }
-  // Doktor sayısı bilinmiyor → 1 ve 2 vet için örnek paylaş.
+  // Vet sayısı bilinmiyor → tek örnek (1 vet) ver, sonra vet sayısı sorulacak.
   const ex1 = getSoloPrice({ modules: ["muhasebe"], vetCount: 1 });
-  const ex2 = getSoloPrice({ modules: ["muhasebe"], vetCount: 2 });
-  return `Aylık taban ${taban}. 1 vet + Muhasebe ≈ ${formatTRY(ex1.total)}; 2 vet + Muhasebe ≈ ${formatTRY(ex2.total)}. Eklenen modüllere göre değişir. KDV hariç.`;
+  return `Aylık taban ${taban}. 1 vet + Muhasebe ≈ ${formatTRY(ex1.total)}. Eklenen modüllere göre değişir. KDV hariç.`;
 }
 
 const PREMIUM_KEYWORDS = /(hastane|poliklinik|şube|merkez|zincir|grup)/i;

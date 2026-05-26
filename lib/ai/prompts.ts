@@ -15,6 +15,7 @@ export function buildSystemPrompt(req: DraftRequest): string {
     "- Kısa tut (mid/hastane ~120 kelime, solo ~80). Tek net mesaj, doğal Türkçe.",
     `- İmza: ${BRAND.senderName} — ${BRAND.senderEmail}.`,
     "- İndirim, garanti veya taahhüt VERME.",
+    "- ASLA önceki mesajdan özür dileme veya geri çekme ('fiyat paylaşmışız, kusura bakmayın' gibi). Akışı doğal devam ettir.",
   ];
   if (req.isCold) {
     parts.push(`- Cold e-posta: gövdenin sonuna opt-out satırı ekle → "${BRAND.optOutText}"`);
