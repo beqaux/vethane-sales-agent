@@ -220,4 +220,28 @@ describe("InboundService.handle", () => {
       "<msg-1@gmail.com>",
     );
   });
+
+  it("yeni lead + plan.notify aynı mesaj için TEK bildirim atılır (dedup)", async () => {
+    // lead: null → upsertByEmail ile yeni lead yaratılır; cls=fiyat+unknown → solo_fiyat plan, notify=true.
+    // İki ayrı notify.hot çağrısı OLMAMALI.
+    const deps = makeDeps({ cls: "fiyat", lead: null });
+    await run(deps);
+    expect(deps.notify.hot).toHaveBeenCalledTimes(1);
+    const call = (deps.notify.hot as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toMatch(/🆕 Web inbound · /);
+  });
+
+  it("notify label: mid + fiyat → 'Premium yanıt (mid)'", async () => {
+    const deps = makeDeps({ cls: "fiyat", segment: "mid" });
+    await run(deps);
+    const labels = (deps.notify.hot as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    expect(labels.some((l: string) => l.includes("Premium yanıt (mid)"))).toBe(true);
+  });
+
+  it("notify label: demo → '🔥 DEMO İSTEĞİ'", async () => {
+    const deps = makeDeps({ cls: "demo", segment: "mid" });
+    await run(deps);
+    const labels = (deps.notify.hot as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    expect(labels.some((l: string) => l.includes("DEMO İSTEĞİ"))).toBe(true);
+  });
 });
