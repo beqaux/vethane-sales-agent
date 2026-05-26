@@ -68,9 +68,15 @@ export const PLAYBOOKS = {
     },
   },
   demoReply: {
-    goal: "Demo isteğini onayla + uygun zaman iste; kurucu bilgilendirilecek.",
+    goal: "Demo isteğini onayla. Müşteri zaman önerdiyse direkt onayla, önermediyse uygun gün/saat iste.",
     guidance:
-      "Demo talebini teyit et, kısa bir teşekkür, 2-3 uygun zaman dilimi sor. Kurucuya bildirim gidecek (sistem). Sayı/taahhüt verme.",
+      "Demo talebini kısa teyit et. İki yol var, BAĞLAMA göre seç:\n" +
+      "  (1) Müşteri belirli bir gün/saat önerdiyse (örn. 'Pazartesi 15:30', 'Çarşamba sabah'): " +
+      "O zamanı NOT ALDIM de. ALTERNATİF SUNMA. 'Kurucumuz o gün size demo bağlantısını " +
+      "iletecek' diye kapat.\n" +
+      "  (2) Müşteri zaman ÖNERMEDİYSE: 'Sizin için uygun gün/saati paylaşır mısınız?' " +
+      "diye SOR. 2-3 sabit slot önerme; bırak müşteri yazsın.\n" +
+      "Sayı/fiyat/taahhüt verme. Demo bağlantısı/URL üretmeye çalışma — kurucu gönderecek.",
   },
   cikisReply: {
     goal: "Çıkış talebini nazikçe onayla.",

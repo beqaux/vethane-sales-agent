@@ -52,10 +52,11 @@ describe("prompt builder — fiyat guardrail (1. katman)", () => {
     expect(buildSystemPrompt(req("solo"))).not.toContain(PRICE_BAN_MARKER);
   });
 
-  it("solo + priceText fiyatı prompt'a koyar (değiştirilmez talimatıyla)", () => {
+  it("solo + priceText fiyatı prompt'a koyar (kopyala-yapıştır talimatıyla)", () => {
     const s = buildSystemPrompt(req("solo", { priceText: "4.160 ₺ + KDV" }));
     expect(s).toContain("4.160 ₺ + KDV");
-    expect(s).toContain("asla değiştirme");
+    expect(s).toContain("KOPYALA-YAPIŞTIR");
+    expect(s).toContain("Sayı UYDURMA");
   });
 
   it("cold mail user prompt'unda ilk temas işareti ve opt-out talimatı", () => {
