@@ -8,8 +8,10 @@ export const RUNTIME = {
   seq: { maxSteps: 3, gapDays: 4 },
 };
 
-// Aksiyon bazlı otomasyon modu — v1: hepsi 'manual' (Gmail taslağı, kurucu onaylar).
-// Güven oluşunca düşük-riskli olanlar 'auto'ya alınır (SPEC §3.3.2).
+// Aksiyon bazlı otomasyon modu (SPEC §3.3.2).
+// Reply path'leri auto: fiyatsız demo-yönlendirme + opt-out + guardrail'ler aktif,
+// hızlı yanıt premium lead deneyimini artırır. Cold/takip'ler hala manual —
+// ilk temas tonunu kurucu görsün.
 export const ACTION_MODES: Record<ActionType, "manual" | "auto"> = {
   // Solo + demo + cikis: auto (hız öncelikli, guardrail'ler aktif).
   solo_cold: "auto",
@@ -17,13 +19,15 @@ export const ACTION_MODES: Record<ActionType, "manual" | "auto"> = {
   solo_fiyat: "auto",
   demo_reply: "auto",
   cikis_reply: "auto",
-  // Mid/Hospital: manuel (premium segment, kurucu gözüyle göndersin).
+  // Mid/Hospital reply: auto — fiyat guardrail aktif, demoya yönlendirme tek mesaj,
+  // bildirim de gidiyor (kurucu Telegram'dan takip eder).
+  mid_reply: "auto",
+  hospital_reply: "auto",
+  // Cold/takip premium hala manuel — ilk temas tonu kurucu kontrolünde.
   mid_cold: "manual",
   mid_takip: "manual",
-  mid_reply: "manual",
   hospital_cold: "manual",
   hospital_takip: "manual",
-  hospital_reply: "manual",
 };
 
 // Marka / mesaj sabitleri.
