@@ -1,4 +1,6 @@
 import { generateObject } from "ai";
+import { google } from "@ai-sdk/google";
+import { anthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 import { retry } from "../util/retry";
 import { AiError } from "../domain/errors";
@@ -6,11 +8,12 @@ import { ClassificationSchema } from "../domain/schemas";
 import { buildSystemPrompt, buildUserPrompt } from "../ai/prompts";
 import type { AiPort } from "../domain/ports";
 
-// Modeller Gateway string'i ile (provider/model). Değiştirmek tek satır.
-// draft: Sonnet 4.6 paid; free tier için Gemini 2.5 Flash (kalite ~Sonnet'in %85-90'ı, Türkçe iyi).
+// Doğrudan provider SDK'ları (Vercel AI Gateway'i bypass — free tier rate limit'ten kaçınmak için).
+// draft: Gemini 2.5 Flash (Türkçe iyi, free 1500 req/day) — GOOGLE_GENERATIVE_AI_API_KEY
+// classify: Claude Haiku 4.5 (yapılandırılmış çıktıda tutarlı, ~$0.05/gün) — ANTHROPIC_API_KEY
 export const MODELS = {
-  draft: "google/gemini-2.5-flash",
-  classify: "anthropic/claude-haiku-4-5",
+  draft: google("gemini-2.5-flash"),
+  classify: anthropic("claude-haiku-4-5"),
 } as const;
 
 const DraftSchema = z.object({
