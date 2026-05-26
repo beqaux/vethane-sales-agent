@@ -154,7 +154,7 @@ export function createInboundService(deps: InboundDeps) {
         if (created.threadId && !lead.gmailThreadId) {
           await deps.leads.setThread(lead.id, created.threadId);
         }
-        const auto = ACTION_MODES[plan.action] === "auto";
+        const auto = ACTION_MODES[plan.action] === "auto" && cls.confidence >= CONF_THRESHOLD;
         if (auto) await deps.mail.send(created.id);
         await deps.msgs.add({
           leadId: lead.id,
