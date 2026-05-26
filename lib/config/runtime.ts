@@ -28,7 +28,6 @@ export const ACTION_MODES: Record<ActionType, "manual" | "auto"> = {
 export const BRAND = {
   senderName: process.env.SENDER_NAME ?? "Vethane",
   senderEmail: process.env.SENDER_EMAIL ?? "info@vethane.com",
-  trialUrl: "https://vethane.com/deneme",
   optOutText: "Bu e-postaları almak istemiyorsanız bu mesaja 'çık' yazarak yanıtlamanız yeterli.",
 };
 

@@ -16,9 +16,9 @@ export const PLAYBOOKS = {
       guidance: "Israrcı olma. 1 cümle yeni değer + 'denemek ister misiniz?'.",
     },
     fiyatReply: {
-      goal: "Açık fiyatı ver + denemeye yönlendir.",
+      goal: "Açık fiyatı ver + demo davet et.",
       guidance:
-        "Fiyatı NET ve config'ten gelen rakamla ver (uydurma). KDV hariç olduğunu belirt. Ardından deneme linkine yönlendir.",
+        "Fiyatı NET ve config'ten gelen rakamla ver (uydurma). KDV hariç olduğunu belirt. priceText doktor sayısı bilinmiyorsa 1 ve 2 vet için iki örnek içerir — onu olduğu gibi aktar. Sonda 'Demo görüşmesi için info@vethane.com adresine yazmanız yeterli, size özel anlatalım' diye davet et. Deneme linki, trial URL veya site adresi BAHSETME.",
     },
   },
   mid: {
