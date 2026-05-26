@@ -6,7 +6,9 @@ import type { MessageRepo } from "../../domain/ports";
 
 export const messageRepo: MessageRepo = {
   async add(msg) {
-    const [row] = await db
+    // Inbound mesajlarda gmail_message_id partial unique — concurrent webhook
+    // tetiklemelerinde ikinci insert ON CONFLICT DO NOTHING ile sessizce yutulur.
+    const rows = await db
       .insert(messages)
       .values({
         leadId: msg.leadId,
@@ -17,8 +19,9 @@ export const messageRepo: MessageRepo = {
         classification: msg.classification,
         status: msg.status,
       })
+      .onConflictDoNothing()
       .returning();
-    return toMessage(row);
+    return rows[0] ? toMessage(rows[0]) : null;
   },
 
   async existsInbound(gmailMessageId) {

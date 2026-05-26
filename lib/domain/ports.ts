@@ -82,7 +82,8 @@ export interface SequenceRepo {
 }
 
 export interface MessageRepo {
-  add(msg: Omit<Message, "id" | "createdAt">): Promise<Message>;
+  /** ON CONFLICT DO NOTHING — duplicate dedup edilirse null döner. */
+  add(msg: Omit<Message, "id" | "createdAt">): Promise<Message | null>;
   existsInbound(gmailMessageId: string): Promise<boolean>;
 }
 
