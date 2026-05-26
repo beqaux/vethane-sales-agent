@@ -164,6 +164,13 @@ export const leadRepo: LeadRepo = {
       })
       .where(eq(leads.id, id));
   },
+
+  async updateVetCount(id, vetSayisi, segment, tier) {
+    await db
+      .update(leads)
+      .set({ vetSayisi, segment, tier, updatedAt: new Date() })
+      .where(eq(leads.id, id));
+  },
 } satisfies LeadRepo;
 
 // Tipi dışa aç (servislerde Lead & {seq} kullanımı için).

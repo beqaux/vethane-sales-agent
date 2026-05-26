@@ -28,7 +28,8 @@ Sınıflar:
 - cikis: listeden çıkmak, "dur", spam şikâyeti, abonelikten çık
 - satis_spami: Vethane veteriner bağlamı dışında başka bir ürün/servis pazarlayan cold mail
   (ör. başka SaaS demo daveti, ajans pitch, backlink takası). Lead'le ilgili DEĞİL.
-confidence: 0-1 güven. segmentGuess: imza/içerikten klinik büyüklüğü tahmini (varsa).`;
+confidence: 0-1 güven. segmentGuess: imza/içerikten klinik büyüklüğü tahmini (varsa).
+vetCountGuess: mesajda veteriner sayısı açıkça yazıyorsa o sayı (örn. "4 veterinerimiz var" → 4). Yazmıyorsa boş bırak.`;
 
 export const aiAdapter: AiPort = {
   async writeDraft(req) {

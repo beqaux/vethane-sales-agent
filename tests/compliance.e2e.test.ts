@@ -146,6 +146,7 @@ describe("uyumluluk e2e", () => {
         subject: "Re",
         body: "Lütfen beni listeden çıkarın.",
         receivedAt: new Date(),
+        headerMessageId: "<g1@y.com>",
       },
     ];
     classifyResult = { cls: "cikis", confidence: 0.95 };

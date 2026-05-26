@@ -32,6 +32,7 @@ const corporateMsg: InboundMessage = {
   subject: "Soru",
   body: "Hangi modülleri sunuyorsunuz?",
   receivedAt: new Date(),
+  headerMessageId: null,
 };
 
 function makeDeps(
