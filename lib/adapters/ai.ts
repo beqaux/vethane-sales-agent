@@ -1,5 +1,4 @@
 import { generateObject } from "ai";
-import { google } from "@ai-sdk/google";
 import { anthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 import { retry } from "../util/retry";
@@ -8,11 +7,11 @@ import { ClassificationSchema } from "../domain/schemas";
 import { buildSystemPrompt, buildUserPrompt } from "../ai/prompts";
 import type { AiPort } from "../domain/ports";
 
-// Doğrudan provider SDK'ları (Vercel AI Gateway'i bypass — free tier rate limit'ten kaçınmak için).
-// draft: Gemini 2.5 Flash (Türkçe iyi, free 1500 req/day) — GOOGLE_GENERATIVE_AI_API_KEY
-// classify: Claude Haiku 4.5 (yapılandırılmış çıktıda tutarlı, ~$0.05/gün) — ANTHROPIC_API_KEY
+// Tek provider: Anthropic Claude Haiku 4.5 (Ocak 2026, Türkçe iyi).
+// draft + classify aynı model — operasyonel basit, tek API key (ANTHROPIC_API_KEY).
+// Gemini "project denied access" hatası sonrası geçildi.
 export const MODELS = {
-  draft: google("gemini-2.5-flash"),
+  draft: anthropic("claude-haiku-4-5"),
   classify: anthropic("claude-haiku-4-5"),
 } as const;
 

@@ -98,7 +98,7 @@ export function createInboundService(deps: InboundDeps) {
       }
     }
 
-    await deps.msgs.add({
+    const inserted = await deps.msgs.add({
       leadId: lead.id,
       direction: "in",
       gmailMessageId: msg.gmailMessageId,
@@ -107,6 +107,9 @@ export function createInboundService(deps: InboundDeps) {
       classification: cls.cls,
       status: null,
     });
+    // null → partial unique index ON CONFLICT yuttu (Pub/Sub at-least-once duplicate).
+    // İkinci flow buradan sonrasını çalıştırmamalı: bildirim/draft tek kez gitsin.
+    if (!inserted) return;
 
     // Mesajda vet sayısı bildirildiyse lead'i güncelle ve segmenti yeniden hesapla.
     // Aksi takdirde ilk yaratıldığı segment'te (örn. solo) kilitli kalır.
