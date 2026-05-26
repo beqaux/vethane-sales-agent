@@ -4,6 +4,7 @@ import { runGuardrails } from "../guardrails";
 import { onReply, onOptout, reschedule } from "./sequence";
 import { ACTION_MODES } from "../config/runtime";
 import { emailDomain, isFreeMailDomain } from "../util/email-parse";
+import { deriveSegment, deriveTier } from "../util/segment";
 import type { NotifyEnrichment } from "./notify";
 import type {
   LeadRepo,
@@ -85,6 +86,22 @@ export function createInboundService(deps: InboundDeps) {
       status: null,
     });
 
+    // Mesajda vet sayısı bildirildiyse lead'i güncelle ve segmenti yeniden hesapla.
+    // Aksi takdirde ilk yaratıldığı segment'te (örn. solo) kilitli kalır.
+    if (cls.vetCountGuess && cls.vetCountGuess !== lead.vetSayisi) {
+      const newSegment = deriveSegment(cls.vetCountGuess, lead.tur);
+      const newTier = deriveTier(newSegment, lead.tur);
+      if (newSegment !== lead.segment || cls.vetCountGuess !== lead.vetSayisi) {
+        await deps.leads.updateVetCount(lead.id, cls.vetCountGuess, newSegment, newTier);
+        await deps.events.log("lead_segment_updated", lead.id, {
+          from: lead.segment,
+          to: newSegment,
+          vetSayisi: cls.vetCountGuess,
+        });
+        lead = { ...lead, vetSayisi: cls.vetCountGuess, segment: newSegment, tier: newTier };
+      }
+    }
+
     const segment: Segment =
       lead.segment !== "unknown" ? lead.segment : (cls.segmentGuess ?? "unknown");
     const plan = playbookFor(segment).buildReply(lead, msg, cls);
@@ -139,8 +156,11 @@ export function createInboundService(deps: InboundDeps) {
         threadContext: `${msg.subject}\n${msg.body}`.slice(0, 1200),
       };
       const gen = await deps.ai.writeDraft(req);
+      const replySubject = /^re:\s/i.test(msg.subject)
+        ? msg.subject
+        : `Re: ${msg.subject}`;
       const draft: OutboundDraft = {
-        subject: gen.subject || `Re: ${msg.subject}`,
+        subject: replySubject,
         body: gen.body,
         segment,
         isCold: false,
@@ -151,13 +171,15 @@ export function createInboundService(deps: InboundDeps) {
       if (!g.ok) {
         await deps.events.log("guardrail_block", lead.id, { reason: g.reason, action: plan.action });
       } else {
+        const replyThread = msg.threadId || lead.gmailThreadId;
         const created = await deps.mail.createDraft(
-          lead.gmailThreadId ?? msg.threadId,
+          replyThread,
           toEmail,
           draft.subject,
           draft.body,
+          msg.headerMessageId,
         );
-        if (created.threadId && !lead.gmailThreadId) {
+        if (created.threadId && created.threadId !== lead.gmailThreadId) {
           await deps.leads.setThread(lead.id, created.threadId);
         }
         const auto = ACTION_MODES[plan.action] === "auto" && cls.confidence >= CONF_THRESHOLD;

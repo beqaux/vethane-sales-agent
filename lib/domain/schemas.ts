@@ -6,6 +6,8 @@ export const ClassificationSchema = z.object({
   cls: z.enum(CLASSIFICATIONS),
   confidence: z.number().min(0).max(1),
   segmentGuess: z.enum(SEGMENTS).optional(),
+  /** Mesajdan çıkarılan veteriner sayısı (örn. "4 veteriner çalışıyor" → 4). */
+  vetCountGuess: z.number().int().positive().optional(),
 });
 export type ClassificationResult = z.infer<typeof ClassificationSchema>;
 

@@ -23,6 +23,7 @@ export interface EmailProvider {
     to: string,
     subject: string,
     body: string,
+    inReplyTo?: string | null,
   ): Promise<{ id: string; threadId: string | null }>;
   send(draftId: string): Promise<string>; // messageId
   listRecentInbound(maxResults?: number): Promise<InboundMessage[]>;
@@ -34,7 +35,12 @@ export interface AiPort {
   writeDraft(req: DraftRequest): Promise<{ subject: string; body: string }>;
   classify(
     msg: InboundMessage,
-  ): Promise<{ cls: Classification; confidence: number; segmentGuess?: Segment }>;
+  ): Promise<{
+    cls: Classification;
+    confidence: number;
+    segmentGuess?: Segment;
+    vetCountGuess?: number;
+  }>;
 }
 
 export interface NotifyPort {
@@ -66,6 +72,7 @@ export interface LeadRepo {
   setEmail(id: string, email: string, confidence: EmailConfidence): Promise<void>;
   byDomain(domain: string): Promise<Lead | null>;
   addAlternateEmail(id: string, email: string): Promise<void>;
+  updateVetCount(id: string, vetSayisi: number, segment: Segment, tier: Tier): Promise<void>;
 }
 
 export interface SequenceRepo {
