@@ -14,11 +14,16 @@ export interface Playbook {
 }
 
 function soloPriceText(lead: Lead): string {
-  const vet = Math.max(1, lead.vetSayisi ?? 1);
-  const example = getSoloPrice({ modules: ["muhasebe"], vetCount: vet });
-  return `Aylık taban ${formatTRY(SOLO_PRICES.taban)}. Örnek (taban + ${vet} vet + Muhasebe) ≈ ${formatTRY(
-    example.total,
-  )}. Eklenen modüllere göre değişir.`;
+  const taban = formatTRY(SOLO_PRICES.taban);
+  const vet = lead.vetSayisi;
+  if (vet && vet > 0) {
+    const ex = getSoloPrice({ modules: ["muhasebe"], vetCount: vet });
+    return `Aylık taban ${taban}. ${vet} vet + Muhasebe modülü ≈ ${formatTRY(ex.total)}. Eklenen modüllere göre değişir. KDV hariç.`;
+  }
+  // Doktor sayısı bilinmiyor → 1 ve 2 vet için örnek paylaş.
+  const ex1 = getSoloPrice({ modules: ["muhasebe"], vetCount: 1 });
+  const ex2 = getSoloPrice({ modules: ["muhasebe"], vetCount: 2 });
+  return `Aylık taban ${taban}. 1 vet + Muhasebe ≈ ${formatTRY(ex1.total)}; 2 vet + Muhasebe ≈ ${formatTRY(ex2.total)}. Eklenen modüllere göre değişir. KDV hariç.`;
 }
 
 function buildOutboundFor(segment: Segment, step: number): DraftSpec {
@@ -31,7 +36,6 @@ function buildOutboundFor(segment: Segment, step: number): DraftSpec {
       isCold: true,
       goal: cfg.goal,
       guidance: cfg.guidance,
-      trialUrl: BRAND.trialUrl,
     };
   }
   if (segment === "hospital") {
@@ -130,8 +134,7 @@ function buildReplyFor(
         newDurum: "cevap_geldi",
         includePrice: true,
         priceText: soloPriceText(lead),
-        trialUrl: BRAND.trialUrl,
-      };
+        };
     }
     // ilgili
     return {
@@ -143,7 +146,6 @@ function buildReplyFor(
       stopSequence: true,
       suppress: false,
       newDurum: "cevap_geldi",
-      trialUrl: BRAND.trialUrl,
     };
   }
 
