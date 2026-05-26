@@ -27,10 +27,19 @@ export function buildSystemPrompt(req: DraftRequest): string {
   } else {
     parts.push(
       req.priceText
-        ? `- Fiyat verirken SADECE şu değeri kullan, asla değiştirme: "${req.priceText}" (KDV hariç).`
+        ? `- FİYAT KURALI (KESİN): Aşağıdaki priceText'i KOPYALA-YAPIŞTIR, BİR HARFİNİ DEĞİŞTİRME.
+  ASLA yeni satır/yeni örnek/yeni rakam EKLEME (örn. "2 vet ≈ X ₺" satırı yasaktır eğer priceText'te yoksa).
+  Sayı UYDURMA. Tablolaştırma. Bullet ekle/çıkar yapma.
+  priceText: """${req.priceText}"""`
         : "- Fiyat sorulmadıkça verme.",
     );
   }
+  parts.push(
+    "- Türkçe doğal akıcı yaz. Çeviri kokuyor → kullanma. Örnek YASAK ifadeler: " +
+      "'Tüm sistem — harika', 'Handaki', 'Bize uygun saatleri yazabilir misiniz' (yapay), " +
+      "'sistemde neler olabileceğini', 'kliniğinize tam uyumlu olup olmadığını'. " +
+      "Doğal Türkçe: 'Anlaştık', 'Not aldım', 'Sizin için uygun gün/saati paylaşır mısınız?'",
+  );
   return parts.join("\n");
 }
 
