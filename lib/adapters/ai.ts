@@ -7,8 +7,9 @@ import { buildSystemPrompt, buildUserPrompt } from "../ai/prompts";
 import type { AiPort } from "../domain/ports";
 
 // Modeller Gateway string'i ile (provider/model). Değiştirmek tek satır.
+// draft: Sonnet 4.6 paid; free tier için Gemini 2.5 Flash (kalite ~Sonnet'in %85-90'ı, Türkçe iyi).
 export const MODELS = {
-  draft: "anthropic/claude-sonnet-4-6",
+  draft: "google/gemini-2.5-flash",
   classify: "anthropic/claude-haiku-4-5",
 } as const;
 
