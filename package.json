@@ -19,7 +19,9 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.79",
     "@ai-sdk/gateway": "^3.0.120",
+    "@ai-sdk/google": "^3.0.79",
     "@neondatabase/serverless": "^1.1.0",
     "ai": "^6.0.191",
     "cheerio": "^1.2.0",

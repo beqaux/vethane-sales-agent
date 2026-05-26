@@ -36,6 +36,7 @@ const msg: InboundMessage = {
   subject: "konu",
   body: "merhaba",
   receivedAt: new Date(),
+  headerMessageId: null,
 };
 
 const clsResult = (
