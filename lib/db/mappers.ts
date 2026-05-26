@@ -21,6 +21,7 @@ export function toLead(r: typeof leads.$inferSelect): Lead {
     kaynak: r.kaynak,
     durum: r.durum,
     gmailThreadId: r.gmailThreadId,
+    alternateEmails: r.alternateEmails ?? [],
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };

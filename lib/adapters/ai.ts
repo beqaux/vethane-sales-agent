@@ -26,6 +26,8 @@ Sınıflar:
 - ilgisiz: ilgilenmiyor / kibar ret (çıkış talebi DEĞİL)
 - oto_yanit: otomatik yanıt (ofis dışı, tatil, no-reply)
 - cikis: listeden çıkmak, "dur", spam şikâyeti, abonelikten çık
+- satis_spami: Vethane veteriner bağlamı dışında başka bir ürün/servis pazarlayan cold mail
+  (ör. başka SaaS demo daveti, ajans pitch, backlink takası). Lead'le ilgili DEĞİL.
 confidence: 0-1 güven. segmentGuess: imza/içerikten klinik büyüklüğü tahmini (varsa).`;
 
 export const aiAdapter: AiPort = {
@@ -52,7 +54,7 @@ export const aiAdapter: AiPort = {
           model: MODELS.classify,
           schema: ClassificationSchema,
           system: CLASSIFY_SYSTEM,
-          prompt: `Konu: ${msg.subject}\n\nMesaj:\n${msg.body}`,
+          prompt: `Gönderen: ${msg.fromEmail}\nKonu: ${msg.subject}\n\nMesaj:\n${msg.body}`,
         }),
       );
       return object;

@@ -21,6 +21,22 @@ describe("deriveSegment", () => {
     expect(deriveSegment(null, null)).toBe("unknown");
     expect(deriveSegment(0, null)).toBe("unknown");
   });
+
+  it("hastane ünvanı + 2 vet → hospital (tür-öncelikli)", () => {
+    expect(deriveSegment(2, "hastane")).toBe("hospital");
+  });
+  it("muayenehane + 3 vet → mid", () => {
+    expect(deriveSegment(3, "muayenehane")).toBe("mid");
+  });
+  it("muayenehane + null vet → solo", () => {
+    expect(deriveSegment(null, "muayenehane")).toBe("solo");
+  });
+  it("poliklinik + 5 vet → mid", () => {
+    expect(deriveSegment(5, "poliklinik")).toBe("mid");
+  });
+  it("poliklinik + 6 vet → hospital", () => {
+    expect(deriveSegment(6, "poliklinik")).toBe("hospital");
+  });
 });
 
 describe("deriveTier", () => {

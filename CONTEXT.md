@@ -23,7 +23,7 @@
 | # | Karar | Seçim | Gerekçe |
 |---|---|---|---|
 | 1 | **Ürün/pazar/satış modeli** | Vethane = vet **işletme yönetimi**; GTM **hedefli, kademeli**: Tier1=250 premium (poliklinik+hastane) öncelik → veriyle Tier2=~770 (3-5 vet); solo=self-servis inbound (cold değil) | Para+acı+moat orada zirve; tek domain ~250'yi kaldırır, 9.637'yi kaldırmaz (deliverability) |
-| 2 | **Ajan rolü** | **Çift-modlu:** solo → açık fiyat + trial; mid/hastane → fiyat YOK, keşif + demo + bildirim | Otomatik fiyat-cevabı, mid/hastane değer-satışını baltalamasın |
+| 2 | **Ajan rolü** | **Çift-modlu:** solo → açık fiyat + trial; mid/hastane → fiyat YOK, keşif + **sistem demosu** + bildirim. **Demo = fake-data ürün-tour'u** (harcama sorusu/teklif YOKTUR); harcama keşfi ve teklif **demo sonrası ayrı bir kurucu görüşmesinde** yapılır (2-adımlı satış: demo → teklif görüşmesi). | Otomatik fiyat-cevabı mid/hastane değer-satışını baltalamasın; demo sürtünmesiz olsun, derin keşif insan-insana. **Not (2026-05-26):** Demo tanımı netleştirildi — `docs/PRICING.md §10` ve `lib/config/playbooks.ts` mesajlarındaki "demoda net teklif" ifadeleri bu doğrultuda güncellenecek. |
 | 3 | **Lead kaynağı** | **Yarı-otomatik küratörlük** → lead DB | 250 hedef küçük & sonlu; kalite > nicelik |
 | 4 | **Otonomi** | **Onaylı başla**, düşük-riskli aksiyonları kademeli auto'ya al | Domain itibarı + 250 "hayal hesabı" korunur |
 | 5 | **E-posta altyapı** | info@vethane.com'u **Google Workspace**'e taşı (iCloud'dan) | iCloud'un API'si yok, ToS-lockout riski; Workspace = API + push + Taslaklar-kuyruğu |
@@ -86,7 +86,19 @@ suppression(email, reason[optout|bounce|manual], created_at)
 events(id, lead_id, type, payload_json, created_at)   -- audit/gözlemlenebilirlik
 ```
 
-**Segment türetme:** `vet_sayisi>=6 → hospital`, `3-5 → mid`, `1-2 → solo`; bilinmiyorsa türden çıkar (hastane→hospital, poliklinik→mid, muayenehane→solo), sinyal geldikçe güncelle.
+**Segment türetme (tür-öncelikli, 2026-05-26 güncellendi):**
+1. **Ünvanında `HASTANE`** varsa → her zaman `hospital` (vet sayısına bakma).
+2. **Ünvanında `POLİKLİNİK`** varsa → `vet_sayisi>=6 → hospital`, aksi `mid` (yasayla ≥4 vet zaten).
+3. **Ünvanında `MUAYENEHANE`** varsa → `vet_sayisi<=2 → solo`, `=3 → mid` (yasayla ≤3 vet).
+4. **Tür belirsiz / ünvanda anahtar yok** → vet sayısına düş: `≥6 → hospital`, `3-5 → mid`, `1-2 → solo`.
+5. **Hiçbir sinyal yok** (örn. web inbound) → `unknown`; sonraki sinyallerle (kurumsal domain + keyword + AI guess + cevap-içinden sayı extract) güncelle.
+
+**Detection katmanları (öncelik sırası):**
+- Sourcing-anı: Places API + web kazıma → tür, vet sayısı, şube sayısı lead DB'ye yazılır.
+- Web inbound: body/subject keyword (`hastane|poliklinik|şube|merkez|zincir` → premium eğilim) + AI `segmentGuess` (Haiku, prompt'a `fromEmail` eklenmeli — şu an eklenmemiş) + cevap-içinden sayı regex.
+- İlk cevap sonrası: "kaç vet?" cevabını parse, segment hard-set.
+
+> **Not:** `fromEmail` domaini (free-mail vs kurumsal) **segment kararına girmez** (2026-05-26 kararı). TR'de küçük-orta klinikler genelde Gmail/Hotmail kullanıyor; domain güvenilir bir bant sinyali değil. Sadece event log'una yazılır.
 
 ---
 

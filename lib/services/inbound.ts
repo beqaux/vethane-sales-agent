@@ -1,8 +1,10 @@
-import { playbookFor } from "../playbooks";
+import { playbookFor, detectPremiumSignal } from "../playbooks";
 import { getKnowledge } from "../ai/knowledge";
 import { runGuardrails } from "../guardrails";
 import { onReply, onOptout, reschedule } from "./sequence";
 import { ACTION_MODES } from "../config/runtime";
+import { emailDomain, isFreeMailDomain } from "../util/email-parse";
+import type { NotifyEnrichment } from "./notify";
 import type {
   LeadRepo,
   SequenceRepo,
@@ -45,16 +47,32 @@ export function createInboundService(deps: InboundDeps) {
       (await deps.leads.byEmail(msg.fromEmail));
 
     if (!lead) {
-      // Web sitesinden direkt inbound (outbound'umuza cevap DEĞİL) — lead'i otomatik oluştur, kurucuyu bilgilendir.
-      lead = await deps.leads.upsertByEmail({
-        email: msg.fromEmail,
-        kurumAdi: `Web inbound — ${msg.fromEmail}`,
-        segment: "unknown",
-        durum: "yeni",
-        kaynak: "inbound",
-      });
-      await deps.events.log("inbound_new_lead", lead.id, { from: msg.fromEmail, cls: cls.cls });
-      await deps.notify.hot(`🆕 Web inbound — ${cls.cls}`, lead, msg);
+      const domain = emailDomain(msg.fromEmail);
+      if (domain && !isFreeMailDomain(domain)) {
+        const existing = await deps.leads.byDomain(domain);
+        if (existing) {
+          await deps.leads.addAlternateEmail(existing.id, msg.fromEmail);
+          lead = {
+            ...existing,
+            alternateEmails: [...existing.alternateEmails, msg.fromEmail.toLowerCase()],
+          };
+          await deps.events.log("inbound_lead_merged", lead.id, {
+            from: msg.fromEmail,
+            matchedDomain: domain,
+          });
+        }
+      }
+      if (!lead) {
+        lead = await deps.leads.upsertByEmail({
+          email: msg.fromEmail,
+          kurumAdi: `Web inbound — ${msg.fromEmail}`,
+          segment: "unknown",
+          durum: "yeni",
+          kaynak: "inbound",
+        });
+        await deps.events.log("inbound_new_lead", lead.id, { from: msg.fromEmail, cls: cls.cls });
+        await deps.notify.hot(`🆕 Web inbound — ${cls.cls}`, lead, msg, { cls });
+      }
     }
 
     await deps.msgs.add({
@@ -69,7 +87,7 @@ export function createInboundService(deps: InboundDeps) {
 
     const segment: Segment =
       lead.segment !== "unknown" ? lead.segment : (cls.segmentGuess ?? "unknown");
-    const plan = playbookFor(segment).buildReply(lead, msg, cls.cls);
+    const plan = playbookFor(segment).buildReply(lead, msg, cls);
 
     const labelThread = lead.gmailThreadId ?? msg.threadId;
     if (labelThread) {
@@ -81,7 +99,7 @@ export function createInboundService(deps: InboundDeps) {
     }
 
     if (cls.confidence < CONF_THRESHOLD) {
-      await deps.notify.hot("❓ Belirsiz cevap — elle bak", lead, msg);
+      await deps.notify.hot("❓ Belirsiz cevap — elle bak", lead, msg, { cls });
     }
 
     if (plan.suppress) await deps.supp.add(lead.email ?? msg.fromEmail, "optout");
@@ -97,7 +115,12 @@ export function createInboundService(deps: InboundDeps) {
 
     if (plan.notify) {
       const label = cls.cls === "demo" ? "🔥 DEMO İSTEĞİ" : "🔥 Premium/ilgili yanıt";
-      await deps.notify.hot(label, lead, msg);
+      const enrich: NotifyEnrichment = {
+        cls,
+        premiumMatch:
+          segment === "unknown" ? detectPremiumSignal({ lead, msg, cls }) : undefined,
+      };
+      await deps.notify.hot(label, lead, msg, enrich);
     }
 
     if (plan.sendDraft) {
@@ -137,7 +160,7 @@ export function createInboundService(deps: InboundDeps) {
         if (created.threadId && !lead.gmailThreadId) {
           await deps.leads.setThread(lead.id, created.threadId);
         }
-        const auto = ACTION_MODES[plan.action] === "auto";
+        const auto = ACTION_MODES[plan.action] === "auto" && cls.confidence >= CONF_THRESHOLD;
         if (auto) await deps.mail.send(created.id);
         await deps.msgs.add({
           leadId: lead.id,

@@ -22,6 +22,7 @@ function makeLead(segment: Segment = "mid"): Lead {
     kaynak: null,
     durum: "sekansta",
     gmailThreadId: "t1",
+    alternateEmails: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -49,11 +50,15 @@ function makeDeps(opts: {
     leads: {
       byThread: vi.fn().mockResolvedValue(lead),
       byEmail: vi.fn().mockResolvedValue(lead),
+      byDomain: vi.fn().mockResolvedValue(null),
+      addAlternateEmail: vi.fn().mockResolvedValue(undefined),
       updateDurum: vi.fn().mockResolvedValue(undefined),
       setThread: vi.fn().mockResolvedValue(undefined),
       dueForSend: vi.fn(),
       byId: vi.fn(),
-      upsertByEmail: vi.fn(),
+      upsertByEmail: vi
+        .fn()
+        .mockResolvedValue(makeLead(opts.segment ?? "mid")),
     },
     seq: {
       get: vi.fn().mockResolvedValue({
@@ -143,14 +148,38 @@ describe("InboundService.handle", () => {
     expect(deps.mail.createDraft).not.toHaveBeenCalled();
   });
 
-  it("lead yoksa → inbound_no_lead, taslak yok", async () => {
+  it("lead yoksa → yeni lead yaratılır + inbound_new_lead event", async () => {
     const deps = makeDeps({ cls: "demo", lead: null });
     await run(deps);
+    expect(deps.leads.upsertByEmail).toHaveBeenCalled();
     expect(deps.events.log).toHaveBeenCalledWith(
-      "inbound_no_lead",
-      null,
+      "inbound_new_lead",
+      expect.any(String),
       expect.objectContaining({ from: "a@b.com" }),
     );
-    expect(deps.mail.createDraft).not.toHaveBeenCalled();
+  });
+
+  it("düşük confidence (<0.5) → auto-mode bypass, mail.send çağrılmaz", async () => {
+    const deps = makeDeps({
+      cls: "fiyat",
+      confidence: 0.3,
+      segment: "solo",
+      aiBody: "Aylık taban 1.950 ₺ + KDV...",
+    });
+    await run(deps);
+    expect(deps.mail.createDraft).toHaveBeenCalled();
+    expect(deps.mail.send).not.toHaveBeenCalled();
+    expect(deps.notify.hot).toHaveBeenCalled();
+  });
+
+  it("notify.hot çağrısı zengin enrichment içerir (cls)", async () => {
+    const deps = makeDeps({ cls: "demo", segment: "mid", confidence: 0.9 });
+    await run(deps);
+    expect(deps.notify.hot).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      expect.any(Object),
+      expect.objectContaining({ cls: expect.objectContaining({ cls: "demo" }) }),
+    );
   });
 });

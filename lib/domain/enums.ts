@@ -34,6 +34,7 @@ export const CLASSIFICATIONS = [
   "ilgisiz",
   "oto_yanit",
   "cikis",
+  "satis_spami",
 ] as const;
 export type Classification = (typeof CLASSIFICATIONS)[number];
 
