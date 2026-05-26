@@ -16,9 +16,13 @@ export const PLAYBOOKS = {
       guidance: "Israrcı olma. 1 cümle yeni değer + 'denemek ister misiniz?'.",
     },
     fiyatReply: {
-      goal: "Açık fiyatı ver + demo davet et.",
+      goal: "Açık fiyatı ver + vet sayısı sor.",
       guidance:
-        "Fiyatı NET ve config'ten gelen rakamla ver (uydurma). KDV hariç olduğunu belirt. priceText doktor sayısı bilinmiyorsa 1 ve 2 vet için iki örnek içerir — onu olduğu gibi aktar. Sonda 'Demo görüşmesi için info@vethane.com adresine yazmanız yeterli, size özel anlatalım' diye davet et. Deneme linki, trial URL veya site adresi BAHSETME.",
+        "Fiyatı NET ve config'ten gelen rakamla ver (uydurma). KDV hariç olduğunu belirt. " +
+        "priceText doktor sayısı bilinmiyorsa 1 ve 2 vet için iki örnek içerir — onu olduğu gibi aktar. " +
+        "Sonda doğru fiyatlandırma için klinikte kaç veteriner ile çalıştıklarını sor: " +
+        "'Doğru fiyatlandırma için klinikte kaç veteriner ile çalıştığınızı öğrenebilir miyim?' " +
+        "Deneme linki, trial URL veya site adresi BAHSETME.",
     },
   },
   mid: {
@@ -31,8 +35,11 @@ export const PLAYBOOKS = {
       guidance: "Kısa, değer odaklı, demo CTA. Sayı yazma.",
     },
     reply: {
-      goal: "Cevaba göre demoya ilerlet. Fiyat sorulsa bile sayı verme, demoda netleştir.",
-      guidance: `Fiyat sorulursa: "Klinik büyüklüğüne göre değişiyor; 20 dk demoda bugün harcadığınızla kıyaslayıp net teklif veriyorum." Keşif sorusunu sor: "${DISCOVERY_QUESTION}"`,
+      goal: "Cevaba göre 2-adımlı satışa yönlendir (önce demo, sonra teklif). FİYAT YOK.",
+      guidance:
+        "Fiyat sorulursa: 'Klinik büyüklüğüne göre değişiyor. 20 dk'lık bir demoda sistemi göstereyim; " +
+        "ardından, ne kadar arka-ofis yükünüz olduğunu birlikte gözden geçirip teklifi ayrı bir görüşmede sunarım.' " +
+        `İlk demoda harcama sorma/teklif verme; o ayrı bir görüşme. Keşif sorusu: "${DISCOVERY_QUESTION}"`,
     },
   },
   hospital: {
@@ -42,8 +49,11 @@ export const PLAYBOOKS = {
     },
     takip: { goal: "Kurumsal takip; demo daveti.", guidance: "Kısa, ölçek değeri, demo CTA. Sayı yok." },
     reply: {
-      goal: "Demoya ilerlet; fiyatı demoda değer-bazlı netleştir.",
-      guidance: `Fiyat sorulursa demoya yönlendir, sayı verme. Keşif: "${DISCOVERY_QUESTION}"`,
+      goal: "2-adımlı satışa yönlendir (demo → ayrı teklif görüşmesi). FİYAT YOK.",
+      guidance:
+        "Fiyat sorulursa demoya yönlendir, sayı verme. Demo = sistem gösterimi; teklif demo SONRASI " +
+        "ayrı görüşmede. " +
+        `Keşif: "${DISCOVERY_QUESTION}"`,
     },
   },
   demoReply: {

@@ -86,7 +86,7 @@ export function createInboundService(deps: InboundDeps) {
 
     const segment: Segment =
       lead.segment !== "unknown" ? lead.segment : (cls.segmentGuess ?? "unknown");
-    const plan = playbookFor(segment).buildReply(lead, msg, cls.cls);
+    const plan = playbookFor(segment).buildReply(lead, msg, cls);
 
     const labelThread = lead.gmailThreadId ?? msg.threadId;
     if (labelThread) {
