@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import {
   SEGMENTS,
   KURUM_TURLERI,
@@ -90,7 +91,14 @@ export const messages = pgTable(
     status: msgStatusEnum("status"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("idx_messages_lead").on(t.leadId, t.createdAt)],
+  (t) => [
+    index("idx_messages_lead").on(t.leadId, t.createdAt),
+    // Pub/Sub at-least-once delivery'ye karşı race-safe dedup: aynı gmailMessageId
+    // 'in' direction'da bir kez insert edilebilir; ikinci insert ON CONFLICT yutulur.
+    uniqueIndex("uniq_inbound_gmail_msg")
+      .on(t.gmailMessageId)
+      .where(sql`${t.direction} = 'in' AND ${t.gmailMessageId} IS NOT NULL`),
+  ],
 );
 
 export const suppression = pgTable("suppression", {
