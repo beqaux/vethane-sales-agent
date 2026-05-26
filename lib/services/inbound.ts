@@ -40,13 +40,21 @@ export function createInboundService(deps: InboundDeps) {
     if (await deps.msgs.existsInbound(msg.gmailMessageId)) return; // dedup
 
     const cls = await deps.ai.classify(msg);
-    const lead =
+    let lead =
       (msg.threadId ? await deps.leads.byThread(msg.threadId) : null) ??
       (await deps.leads.byEmail(msg.fromEmail));
 
     if (!lead) {
-      await deps.events.log("inbound_no_lead", null, { from: msg.fromEmail, cls: cls.cls });
-      return;
+      // Web sitesinden direkt inbound (outbound'umuza cevap DEĞİL) — lead'i otomatik oluştur, kurucuyu bilgilendir.
+      lead = await deps.leads.upsertByEmail({
+        email: msg.fromEmail,
+        kurumAdi: `Web inbound — ${msg.fromEmail}`,
+        segment: "unknown",
+        durum: "yeni",
+        kaynak: "inbound",
+      });
+      await deps.events.log("inbound_new_lead", lead.id, { from: msg.fromEmail, cls: cls.cls });
+      await deps.notify.hot(`🆕 Web inbound — ${cls.cls}`, lead, msg);
     }
 
     await deps.msgs.add({
@@ -155,7 +163,12 @@ export function createInboundService(deps: InboundDeps) {
           await handleMessage(msg);
           processed++;
         } catch (e) {
-          await deps.events.log("inbound_error", null, { from: msg.fromEmail, error: String(e) });
+          const err = e as Error & { cause?: unknown };
+          await deps.events.log("inbound_error", null, {
+            from: msg.fromEmail,
+            error: err.message ?? String(e),
+            cause: err.cause ? String(err.cause).slice(0, 500) : undefined,
+          });
         }
       }
       return { processed };
