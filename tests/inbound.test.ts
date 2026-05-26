@@ -76,7 +76,7 @@ function makeDeps(opts: {
     },
     supp: { has: vi.fn().mockResolvedValue(false), add: vi.fn().mockResolvedValue(undefined) },
     msgs: {
-      add: vi.fn().mockResolvedValue(undefined),
+      add: vi.fn().mockResolvedValue({ id: "m1", createdAt: new Date() }),
       existsInbound: vi.fn().mockResolvedValue(opts.existsInbound ?? false),
     },
     events: { log: vi.fn().mockResolvedValue(undefined) },
@@ -243,5 +243,13 @@ describe("InboundService.handle", () => {
     await run(deps);
     const labels = (deps.notify.hot as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
     expect(labels.some((l: string) => l.includes("DEMO İSTEĞİ"))).toBe(true);
+  });
+
+  it("msgs.add null dönerse (Pub/Sub duplicate) bildirim/draft atılmaz", async () => {
+    const deps = makeDeps({ cls: "demo", segment: "mid" });
+    deps.msgs.add = vi.fn().mockResolvedValue(null);
+    await run(deps);
+    expect(deps.notify.hot).not.toHaveBeenCalled();
+    expect(deps.mail.createDraft).not.toHaveBeenCalled();
   });
 });
