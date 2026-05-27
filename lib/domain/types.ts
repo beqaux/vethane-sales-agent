@@ -10,6 +10,8 @@ import type {
   EmailConfidence,
   Tier,
   ActionType,
+  PendingActionKind,
+  PendingActionStatus,
 } from "./enums";
 
 // --- Çekirdek varlıklar (SPEC §5) ---
@@ -153,4 +155,19 @@ export interface Candidate {
   phone: string | null;
   placeId: string | null;
   kaynak: string;
+}
+
+// --- Telegram dar-onay yüzeyi (ADR-0006) ---
+
+export interface PendingAction {
+  id: string;
+  kind: PendingActionKind;
+  leadId: string;
+  gmailDraftId: string | null;
+  gmailThreadId: string | null;
+  payload: Record<string, unknown>;
+  status: PendingActionStatus;
+  expiresAt: Date;
+  createdAt: Date;
+  resolvedAt: Date | null;
 }
