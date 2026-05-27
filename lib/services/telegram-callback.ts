@@ -126,6 +126,12 @@ export function createTelegramCallbackService(deps: TelegramCallbackDeps) {
     if (pending.kind === "confirm_demo_time" && verb === "confirm") {
       return handleConfirmDemoTime(pending, cb);
     }
+    if (pending.kind === "send_draft" && verb === "send") {
+      return handleSendDraft(pending, cb);
+    }
+    if (pending.kind === "send_draft" && verb === "cancel") {
+      return handleCancelDraft(pending, cb);
+    }
 
     await deps.notify.answerCallback(cb.id, {
       text: "Bu aksiyon henüz hazır değil",
@@ -241,6 +247,212 @@ export function createTelegramCallbackService(deps: TelegramCallbackDeps) {
         pendingId: pending.id,
       });
     }
+  }
+
+  // ADR-0006 §2.1 akış #1 (#5 reuse) — taslak gönder/iptal.
+  // Order: CAS resolve → guards → mail.send/deleteDraft → edit + ack + event.
+  // E1/E2/E5/E6/E8 PROMPT §3.5 + §6.
+
+  function eventTag(p: PendingAction, base: "sent" | "cancelled"): string {
+    const payload = p.payload as Record<string, unknown>;
+    const action = typeof payload.action === "string" ? payload.action : "unknown";
+    // mid_cold/hospital_cold → cold_draft_*_via_telegram
+    // mid_reply/hospital_reply/solo_* (T11) → uncertain_reply_*_via_telegram
+    const isCold = action === "mid_cold" || action === "hospital_cold";
+    const prefix = isCold ? "cold_draft" : "uncertain_reply";
+    return `${prefix}_${base}_via_telegram`;
+  }
+
+  async function refuseSend(
+    pending: PendingAction,
+    cb: TelegramCallbackQuery,
+    statusText: string,
+    toast: string,
+    eventType: string,
+    leadId: string | null,
+    eventPayload: Record<string, unknown>,
+  ): Promise<void> {
+    // Pending'i cancelled'a alıp Gmail draft'ı temizliyoruz (varsa).
+    const claimed = await deps.pendingActions.resolve(pending.id, "cancelled");
+    if (!claimed) {
+      await deps.notify.answerCallback(cb.id, { text: "Zaten yapıldı" });
+      return;
+    }
+    if (pending.gmailDraftId) {
+      try {
+        await deps.mail.deleteDraft(pending.gmailDraftId);
+      } catch {
+        /* draft zaten silinmiş olabilir — best-effort */
+      }
+    }
+    await editStatus(pending, statusText);
+    await deps.notify.answerCallback(cb.id, { text: toast });
+    await deps.events.log(eventType, leadId, eventPayload);
+  }
+
+  async function handleSendDraft(
+    pending: PendingAction,
+    cb: TelegramCallbackQuery,
+  ): Promise<void> {
+    const lead = await deps.leads.byId(pending.leadId);
+    if (!lead) {
+      await refuseSend(
+        pending,
+        cb,
+        "❌ Lead bulunamadı — taslak iptal",
+        "Lead bulunamadı",
+        "send_draft_lead_missing",
+        null,
+        { pendingId: pending.id },
+      );
+      return;
+    }
+
+    // E5: lead durumu değişmiş (kaybedildi/cikti).
+    if (lead.durum === "kaybedildi" || lead.durum === "cikti") {
+      await refuseSend(
+        pending,
+        cb,
+        `ℹ️ Lead durumu değişmiş (${lead.durum}), gönderilmedi`,
+        "Lead durumu değişmiş",
+        "send_draft_skipped_durum",
+        lead.id,
+        { durum: lead.durum, pendingId: pending.id },
+      );
+      return;
+    }
+
+    // E1: müşteri arada cevap verdi (durum=cevap_geldi).
+    if (lead.durum === "cevap_geldi") {
+      await refuseSend(
+        pending,
+        cb,
+        "⚠️ Müşteri arada cevap verdi — taslak iptal",
+        "Müşteri cevap verdi",
+        "send_draft_skipped_reply_arrived",
+        lead.id,
+        { pendingId: pending.id },
+      );
+      return;
+    }
+
+    // E6: suppression (lead.email).
+    const toEmail = lead.email;
+    if (toEmail && (await deps.supp.has(toEmail))) {
+      await refuseSend(
+        pending,
+        cb,
+        "ℹ️ Email suppression'da, gönderilmedi",
+        "Suppression",
+        "send_draft_skipped_suppression",
+        lead.id,
+        { pendingId: pending.id },
+      );
+      return;
+    }
+
+    // E2: Gmail draft hala var mı?
+    if (!pending.gmailDraftId) {
+      await refuseSend(
+        pending,
+        cb,
+        "❌ Draft id eksik — gönderilmedi",
+        "Draft eksik",
+        "send_draft_missing_draft_id",
+        lead.id,
+        { pendingId: pending.id },
+      );
+      return;
+    }
+    try {
+      await deps.mail.getDraft(pending.gmailDraftId);
+    } catch (e) {
+      await refuseSend(
+        pending,
+        cb,
+        "❌ Draft Gmail'de bulunamadı — taslak iptal",
+        "Draft bulunamadı",
+        "send_draft_missing_in_gmail",
+        lead.id,
+        { pendingId: pending.id, error: (e as Error).message },
+      );
+      return;
+    }
+
+    // CAS resolve (double-tap atomic).
+    const claimed = await deps.pendingActions.resolve(pending.id, "resolved");
+    if (!claimed) {
+      await deps.notify.answerCallback(cb.id, { text: "Zaten yapıldı" });
+      return;
+    }
+
+    try {
+      await deps.mail.send(pending.gmailDraftId);
+      // Outbound message kaydı: status='sent' (mevcut 'draft' satırı dokunulmaz —
+      // events log + status='sent' duplicate satırı kurucu için audit).
+      await deps.msgs.add({
+        leadId: lead.id,
+        direction: "out",
+        gmailMessageId: null,
+        subject: null,
+        body: null,
+        classification: null,
+        status: "sent",
+      });
+      await editStatus(pending, `✅ Gönderildi ${hhmm()}`);
+      await deps.notify.answerCallback(cb.id, { text: "Gönderildi" });
+      await deps.events.log(eventTag(pending, "sent"), lead.id, {
+        pendingId: pending.id,
+        draftId: pending.gmailDraftId,
+      });
+    } catch (e) {
+      // E8: send fail. Pending zaten 'resolved' — re-tap çalışmaz.
+      // Kurucu Gmail Drafts'tan manuel atabilir (draft hala orada).
+      const err = e as Error;
+      await editStatus(
+        pending,
+        "❌ Gönderim başarısız — kurucu Gmail'den manuel atsın",
+      );
+      await deps.notify.answerCallback(cb.id, {
+        text: "Gönderim başarısız",
+        alert: true,
+      });
+      await deps.events.log("send_draft_send_failed", lead.id, {
+        pendingId: pending.id,
+        error: err.message,
+      });
+    }
+  }
+
+  async function handleCancelDraft(
+    pending: PendingAction,
+    cb: TelegramCallbackQuery,
+  ): Promise<void> {
+    // CAS resolve('cancelled') — double-tap atomic.
+    const claimed = await deps.pendingActions.resolve(pending.id, "cancelled");
+    if (!claimed) {
+      await deps.notify.answerCallback(cb.id, { text: "Zaten yapıldı" });
+      return;
+    }
+
+    // Best-effort: Gmail draft'ı sil. Hata olursa pending zaten 'cancelled'.
+    if (pending.gmailDraftId) {
+      try {
+        await deps.mail.deleteDraft(pending.gmailDraftId);
+      } catch (e) {
+        await deps.events.log("send_draft_delete_failed", pending.leadId, {
+          pendingId: pending.id,
+          draftId: pending.gmailDraftId,
+          error: (e as Error).message,
+        });
+      }
+    }
+
+    await editStatus(pending, `❌ İptal edildi ${hhmm()}`);
+    await deps.notify.answerCallback(cb.id, { text: "İptal edildi" });
+    await deps.events.log(eventTag(pending, "cancelled"), pending.leadId, {
+      pendingId: pending.id,
+    });
   }
 
   return { handle };
