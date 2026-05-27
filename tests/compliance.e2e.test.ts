@@ -107,7 +107,7 @@ const ai = {
   classify: async () => classifyResult,
 };
 
-const notify = { hot: async () => {} };
+const notify = { hot: async () => {}, failure: async () => {} };
 
 const outbound = createOutboundService({
   leads,
@@ -117,6 +117,7 @@ const outbound = createOutboundService({
   events,
   mail,
   ai,
+  notify,
 } as unknown as OutboundDeps);
 
 const inbound = createInboundService({

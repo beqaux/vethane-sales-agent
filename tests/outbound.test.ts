@@ -61,6 +61,7 @@ function makeDeps(aiBody: string, lead = makeLead()) {
       watch: vi.fn(),
     },
     ai: { writeDraft: vi.fn().mockResolvedValue({ subject: "S", body: aiBody }), classify: vi.fn() },
+    notify: { hot: vi.fn().mockResolvedValue(undefined), failure: vi.fn().mockResolvedValue(undefined) },
   };
 }
 
@@ -92,6 +93,31 @@ describe("OutboundService.processDue", () => {
       "1",
       expect.objectContaining({ action: "mid_cold" }),
     );
+    // ADR-0006 §2.3 — guardrail block → Telegram failure notify.
+    expect(deps.notify.failure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "guardrail",
+        action: "mid_cold",
+        reason: expect.any(String),
+      }),
+    );
+  });
+
+  it("auto mid_takip (ADR-0006 flip): mail.send çağrılır, notify YOK", async () => {
+    // mid_takip artık auto: step=1 (takip), mid segment'inde send tetiklenmeli,
+    // ama hot/failure notify tetiklenmemeli (sessiz auto).
+    const lead = makeLead();
+    const seqStep1 = { ...seqState, currentStep: 1 };
+    const deps = makeDeps("Geçen mailimi gördünüz mü?", lead);
+    deps.leads.dueForSend = vi
+      .fn()
+      .mockResolvedValue([{ ...lead, seq: seqStep1 }]);
+    const svc = createOutboundService(deps as unknown as OutboundDeps);
+    const res = await svc.processDue();
+    expect(res.sent).toBe(1);
+    expect(deps.mail.send).toHaveBeenCalledTimes(1);
+    expect(deps.notify.hot).not.toHaveBeenCalled();
+    expect(deps.notify.failure).not.toHaveBeenCalled();
   });
 
   it("dueForSend doğru tier ve cap ile çağrılır", async () => {

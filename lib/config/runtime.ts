@@ -25,11 +25,14 @@ export const ACTION_MODES: Record<ActionType, "manual" | "auto"> = {
   hospital_reply: "auto",
   // Demo onayı SONRASI takip ("teşekkürler", "OK" gibi): bot karışmaz, kurucu görür.
   demo_followup: "manual",
-  // Cold/takip premium hala manuel — ilk temas tonu kurucu kontrolünde.
+  // Cold premium: manuel + Telegram button (ADR-0006 §2.2). İlk temas asimetrik
+  // (250 hayal hesabından biri yanarsa kalıcı) — kurucu onayı korunur.
   mid_cold: "manual",
-  mid_takip: "manual",
   hospital_cold: "manual",
-  hospital_takip: "manual",
+  // Premium takip (ADR-0006): auto. Kalıp tutturulmuş, varyans düşük; gradyan-auto
+  // politikasının doğal kademesi. Notify sessiz (kurucu logları Gmail'de görür).
+  mid_takip: "auto",
+  hospital_takip: "auto",
 };
 
 // Marka / mesaj sabitleri.

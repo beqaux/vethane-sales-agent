@@ -38,6 +38,7 @@ export const outboundService = createOutboundService({
   events: eventRepo,
   mail: gmailAdapter,
   ai: aiAdapter,
+  notify: notifyService,
 });
 
 export const inboundService = createInboundService({

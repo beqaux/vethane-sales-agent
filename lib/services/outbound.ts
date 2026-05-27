@@ -13,6 +13,7 @@ import type {
   EmailProvider,
   AiPort,
 } from "../domain/ports";
+import type { NotifyService } from "./notify";
 import type { DraftRequest, OutboundDraft } from "../domain/types";
 
 export interface OutboundDeps {
@@ -23,6 +24,7 @@ export interface OutboundDeps {
   events: EventRepo;
   mail: EmailProvider;
   ai: AiPort;
+  notify: NotifyService;
 }
 
 export interface OutboundResult {
@@ -71,6 +73,13 @@ export function createOutboundService(deps: OutboundDeps) {
         const g = runGuardrails(draft, { lead, suppressed });
         if (!g.ok) {
           await deps.events.log("guardrail_block", lead.id, { reason: g.reason, action: spec.action });
+          // ADR-0006 §2.3: kurucu Telegram'da görsün — sessiz hata yok.
+          await deps.notify.failure({
+            kind: "guardrail",
+            lead,
+            action: spec.action,
+            reason: g.reason,
+          });
           blocked++;
           continue;
         }
