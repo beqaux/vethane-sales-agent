@@ -100,6 +100,19 @@ function makeDeps(opts: {
     notify: {
       hot: vi.fn().mockResolvedValue(undefined),
       failure: vi.fn().mockResolvedValue(undefined),
+      demoTimeApproval: vi.fn().mockResolvedValue({ chatId: "12345", messageId: 7 }),
+      coldDraftApproval: vi.fn().mockResolvedValue({ chatId: "12345", messageId: 8 }),
+      uncertainReplyApproval: vi.fn().mockResolvedValue({ chatId: "12345", messageId: 9 }),
+    },
+    pendingActions: {
+      create: vi.fn().mockResolvedValue({
+        pending: { id: "p-1" },
+        tokenPrefix: "p-1aaaaa",
+      }),
+      resolve: vi.fn().mockResolvedValue(true),
+      updatePayload: vi.fn().mockResolvedValue(undefined),
+      expireDue: vi.fn().mockResolvedValue(0),
+      tokenPrefix: (id: string) => id.slice(0, 8),
     },
   };
 }
@@ -328,5 +341,85 @@ describe("InboundService.handle", () => {
       null,
       expect.objectContaining({ raw: "Salı 14:00", cls: "ilgili" }),
     );
+  });
+
+  // ADR-0006 §2.1 akış #3 — demo time onayı
+  it("durum=demo_istedi + proposedTime VAR → pending_action + demoTimeApproval (2 buton)", async () => {
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({
+      cls: "ilgili",
+      segment: "mid",
+      lead,
+      proposedTime: { raw: "merhaba" },
+    });
+    // msg.body = "merhaba" → proposedTime substring matches → korunur
+    await run(deps);
+    expect(deps.pendingActions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "confirm_demo_time",
+        leadId: "1",
+        gmailThreadId: "t1",
+        payload: expect.objectContaining({
+          proposedTimeRaw: "merhaba",
+          fromEmail: "a@b.com",
+          headerMessageId: "<msg-1@gmail.com>",
+        }),
+      }),
+    );
+    expect(deps.notify.demoTimeApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lead,
+        fromEmail: "a@b.com",
+        rawTime: "merhaba",
+        threadId: "t1",
+        tokenPrefix: expect.any(String),
+      }),
+    );
+    // Pending payload'a telegram lokasyonu yazılır (T8 edit için)
+    expect(deps.pendingActions.updatePayload).toHaveBeenCalledWith(
+      "p-1",
+      expect.objectContaining({
+        telegram: { chatId: "12345", messageId: 7 },
+      }),
+    );
+    // Hot notify atlanır (duplicate engeli) — sadece demo button mesajı gitsin.
+    expect(deps.notify.hot).not.toHaveBeenCalled();
+    // Bot taslak yazmaz (sendDraft hala false).
+    expect(deps.mail.createDraft).not.toHaveBeenCalled();
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "demo_time_pending",
+      "1",
+      expect.objectContaining({ raw: "merhaba" }),
+    );
+  });
+
+  it("durum=demo_istedi + proposedTime YOK → eski info notify (status quo)", async () => {
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({ cls: "ilgili", segment: "mid", lead });
+    await run(deps);
+    expect(deps.pendingActions.create).not.toHaveBeenCalled();
+    expect(deps.notify.demoTimeApproval).not.toHaveBeenCalled();
+    expect(deps.notify.hot).toHaveBeenCalled();
+    const labels = (deps.notify.hot as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c) => c[0],
+    );
+    expect(labels.some((l: string) => l.includes("Demo sonrası mesaj"))).toBe(true);
+  });
+
+  it("demoTimeApproval Telegram fail → pending cancelled, fall-back hot notify", async () => {
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({
+      cls: "ilgili",
+      segment: "mid",
+      lead,
+      proposedTime: { raw: "merhaba" },
+    });
+    deps.notify.demoTimeApproval = vi.fn().mockResolvedValue(null);
+    await run(deps);
+    expect(deps.pendingActions.resolve).toHaveBeenCalledWith("p-1", "cancelled");
+    expect(deps.notify.hot).toHaveBeenCalled();
   });
 });
