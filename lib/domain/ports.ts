@@ -42,6 +42,8 @@ export interface AiPort {
     confidence: number;
     segmentGuess?: Segment;
     vetCountGuess?: number;
+    /** ADR-0006 §2.4: müşterinin literal substring gün+saat ifadesi. */
+    proposedTime?: { raw: string };
   }>;
 }
 

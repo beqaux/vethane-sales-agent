@@ -69,6 +69,14 @@ export function createInboundService(deps: InboundDeps) {
     if (await deps.msgs.existsInbound(msg.gmailMessageId)) return; // dedup
 
     const cls = await deps.ai.classify(msg);
+    // ADR-0006 §2.4: substring guardrail — AI uydurma proposedTime drop.
+    if (cls.proposedTime && !msg.body.includes(cls.proposedTime.raw)) {
+      await deps.events.log("classify_propose_time_hallucination", null, {
+        raw: cls.proposedTime.raw,
+        cls: cls.cls,
+      });
+      cls.proposedTime = undefined;
+    }
     let lead =
       (msg.threadId ? await deps.leads.byThread(msg.threadId) : null) ??
       (await deps.leads.byEmail(msg.fromEmail));
