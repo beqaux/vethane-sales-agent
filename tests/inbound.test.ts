@@ -46,6 +46,7 @@ function makeDeps(opts: {
   lead?: Lead | null;
   existsInbound?: boolean;
   vetCountGuess?: number;
+  proposedTime?: { raw: string };
 }) {
   const lead = opts.lead === undefined ? makeLead(opts.segment ?? "mid") : opts.lead;
   return {
@@ -92,10 +93,27 @@ function makeDeps(opts: {
         cls: opts.cls,
         confidence: opts.confidence ?? 0.9,
         vetCountGuess: opts.vetCountGuess,
+        proposedTime: opts.proposedTime,
       }),
       writeDraft: vi.fn().mockResolvedValue({ subject: "Re", body: opts.aiBody ?? "yanıt" }),
     },
-    notify: { hot: vi.fn().mockResolvedValue(undefined) },
+    notify: {
+      hot: vi.fn().mockResolvedValue(undefined),
+      failure: vi.fn().mockResolvedValue(undefined),
+      demoTimeApproval: vi.fn().mockResolvedValue({ chatId: "12345", messageId: 7 }),
+      coldDraftApproval: vi.fn().mockResolvedValue({ chatId: "12345", messageId: 8 }),
+      uncertainReplyApproval: vi.fn().mockResolvedValue({ chatId: "12345", messageId: 9 }),
+    },
+    pendingActions: {
+      create: vi.fn().mockResolvedValue({
+        pending: { id: "p-1" },
+        tokenPrefix: "p-1aaaaa",
+      }),
+      resolve: vi.fn().mockResolvedValue(true),
+      updatePayload: vi.fn().mockResolvedValue(undefined),
+      expireDue: vi.fn().mockResolvedValue(0),
+      tokenPrefix: (id: string) => id.slice(0, 8),
+    },
   };
 }
 
@@ -176,7 +194,8 @@ describe("InboundService.handle", () => {
     await run(deps);
     expect(deps.mail.createDraft).toHaveBeenCalled();
     expect(deps.mail.send).not.toHaveBeenCalled();
-    expect(deps.notify.hot).toHaveBeenCalled();
+    // T11 sonrası: hot notify YOK — uncertainReplyApproval (3-buton) fire eder.
+    expect(deps.notify.uncertainReplyApproval).toHaveBeenCalled();
   });
 
   it("notify.hot çağrısı zengin enrichment içerir (cls)", async () => {
@@ -287,5 +306,209 @@ describe("InboundService.handle", () => {
     expect(deps.supp.add).toHaveBeenCalled();
     expect(deps.leads.updateDurum).toHaveBeenCalledWith("1", "cikti");
     expect(deps.mail.createDraft).toHaveBeenCalled();
+  });
+
+  // ADR-0006 §2.4 — substring guardrail
+  it("proposedTime body'de literal substring → korunur, log YOK", async () => {
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({
+      cls: "ilgili",
+      segment: "mid",
+      lead,
+      proposedTime: { raw: "merhaba" },
+    });
+    await run(deps);
+    expect(deps.events.log).not.toHaveBeenCalledWith(
+      "classify_propose_time_hallucination",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("proposedTime body'de YOK (AI uydurma) → drop + halüsinasyon event log", async () => {
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({
+      cls: "ilgili",
+      segment: "mid",
+      lead,
+      proposedTime: { raw: "Salı 14:00" },
+    });
+    // msg.body = "merhaba", "Salı 14:00" yok → drop
+    await run(deps);
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "classify_propose_time_hallucination",
+      null,
+      expect.objectContaining({ raw: "Salı 14:00", cls: "ilgili" }),
+    );
+  });
+
+  // ADR-0006 §2.1 akış #3 — demo time onayı
+  it("durum=demo_istedi + proposedTime VAR → pending_action + demoTimeApproval (2 buton)", async () => {
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({
+      cls: "ilgili",
+      segment: "mid",
+      lead,
+      proposedTime: { raw: "merhaba" },
+    });
+    // msg.body = "merhaba" → proposedTime substring matches → korunur
+    await run(deps);
+    expect(deps.pendingActions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "confirm_demo_time",
+        leadId: "1",
+        gmailThreadId: "t1",
+        payload: expect.objectContaining({
+          proposedTimeRaw: "merhaba",
+          fromEmail: "a@b.com",
+          headerMessageId: "<msg-1@gmail.com>",
+        }),
+      }),
+    );
+    expect(deps.notify.demoTimeApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lead,
+        fromEmail: "a@b.com",
+        rawTime: "merhaba",
+        threadId: "t1",
+        tokenPrefix: expect.any(String),
+      }),
+    );
+    // Pending payload'a telegram lokasyonu yazılır (T8 edit için)
+    expect(deps.pendingActions.updatePayload).toHaveBeenCalledWith(
+      "p-1",
+      expect.objectContaining({
+        telegram: { chatId: "12345", messageId: 7 },
+      }),
+    );
+    // Hot notify atlanır (duplicate engeli) — sadece demo button mesajı gitsin.
+    expect(deps.notify.hot).not.toHaveBeenCalled();
+    // Bot taslak yazmaz (sendDraft hala false).
+    expect(deps.mail.createDraft).not.toHaveBeenCalled();
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "demo_time_pending",
+      "1",
+      expect.objectContaining({ raw: "merhaba" }),
+    );
+  });
+
+  it("durum=demo_istedi + proposedTime YOK → eski info notify (status quo)", async () => {
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({ cls: "ilgili", segment: "mid", lead });
+    await run(deps);
+    expect(deps.pendingActions.create).not.toHaveBeenCalled();
+    expect(deps.notify.demoTimeApproval).not.toHaveBeenCalled();
+    expect(deps.notify.hot).toHaveBeenCalled();
+    const labels = (deps.notify.hot as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c) => c[0],
+    );
+    expect(labels.some((l: string) => l.includes("Demo sonrası mesaj"))).toBe(true);
+  });
+
+  it("demoTimeApproval Telegram fail → pending cancelled, fall-back hot notify", async () => {
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({
+      cls: "ilgili",
+      segment: "mid",
+      lead,
+      proposedTime: { raw: "merhaba" },
+    });
+    deps.notify.demoTimeApproval = vi.fn().mockResolvedValue(null);
+    await run(deps);
+    expect(deps.pendingActions.resolve).toHaveBeenCalledWith("p-1", "cancelled");
+    expect(deps.notify.hot).toHaveBeenCalled();
+  });
+
+  // ADR-0006 §2.1 akış #5 — T11
+  it("low-conf (<0.5) + plan.sendDraft → pending_action + uncertainReplyApproval (3 buton)", async () => {
+    const deps = makeDeps({
+      cls: "fiyat",
+      confidence: 0.3,
+      segment: "solo",
+      aiBody: "Aylık taban 1.950 ₺ + KDV...",
+    });
+    await run(deps);
+    expect(deps.mail.createDraft).toHaveBeenCalled();
+    expect(deps.mail.send).not.toHaveBeenCalled();
+    expect(deps.notify.uncertainReplyApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cls: expect.objectContaining({ cls: "fiyat", confidence: 0.3 }),
+        msgBody: "merhaba",
+        threadId: "t1",
+        tokenPrefix: expect.any(String),
+      }),
+    );
+    expect(deps.pendingActions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "send_draft",
+        leadId: "1",
+        gmailDraftId: "d1",
+        payload: expect.objectContaining({
+          action: "solo_fiyat",
+          classification: "fiyat",
+          confidence: 0.3,
+          telegram: { chatId: "12345", messageId: 9 },
+        }),
+      }),
+    );
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "uncertain_reply_pending",
+      "1",
+      expect.objectContaining({ action: "solo_fiyat", confidence: 0.3 }),
+    );
+    // Hot notify atılmaz — button mesajı zaten her şeyi gösterir.
+    expect(deps.notify.hot).not.toHaveBeenCalled();
+  });
+
+  it("low-conf + sendDraft=false (ilgisiz) → eski info notify (button yok)", async () => {
+    const deps = makeDeps({
+      cls: "ilgisiz",
+      confidence: 0.3,
+      segment: "mid",
+    });
+    await run(deps);
+    expect(deps.notify.uncertainReplyApproval).not.toHaveBeenCalled();
+    expect(deps.pendingActions.create).not.toHaveBeenCalled();
+    expect(deps.mail.createDraft).not.toHaveBeenCalled();
+    const hotLabels = (deps.notify.hot as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c) => c[0],
+    );
+    expect(hotLabels.some((l: string) => l.includes("Belirsiz"))).toBe(true);
+  });
+
+  it("low-conf + uncertainReplyApproval fail → fall-back info notify", async () => {
+    const deps = makeDeps({
+      cls: "fiyat",
+      confidence: 0.3,
+      segment: "solo",
+      aiBody: "...",
+    });
+    deps.notify.uncertainReplyApproval = vi.fn().mockResolvedValue(null);
+    await run(deps);
+    expect(deps.pendingActions.create).not.toHaveBeenCalled();
+    expect(deps.notify.hot).toHaveBeenCalled();
+    const labels = (deps.notify.hot as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c) => c[0],
+    );
+    expect(
+      labels.some((l: string) => l.includes("Telegram notify atılamadı")),
+    ).toBe(true);
+  });
+
+  it("high-conf (>=0.5) → uncertain button YOK, status quo", async () => {
+    const deps = makeDeps({
+      cls: "fiyat",
+      confidence: 0.9,
+      segment: "solo",
+      aiBody: "Aylık taban...",
+    });
+    await run(deps);
+    expect(deps.notify.uncertainReplyApproval).not.toHaveBeenCalled();
+    expect(deps.mail.send).toHaveBeenCalled(); // auto fired (solo_fiyat + conf>=0.5)
   });
 });

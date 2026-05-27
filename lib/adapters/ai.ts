@@ -34,7 +34,13 @@ confidence: 0-1 güven. segmentGuess: imza/içerikten klinik büyüklüğü tahm
 vetCountGuess: mesajda veteriner sayısı açıkça yazıyorsa o sayı (örn. "4 veterinerimiz var" → 4).
   ÖNEMLİ: Önceki Vethane mesajı "Kaç veteriner ile çalıştığınızı öğrenebilir miyim?" sorduysa ve
   müşteri sadece bir sayı yazdıysa ("3", "4 vet", "5 kişi" gibi) → o sayı vetCountGuess'tir.
-  Yazmıyorsa boş bırak.`;
+  Yazmıyorsa boş bırak.
+
+proposedTime.raw: Eğer mesaj GELECEK bir tarih için spesifik bir gün+saat önerisi içeriyorsa
+(örn. "Salı 14:00 müsait", "yarın 10'da", "27 Mayıs Çarşamba 14:00"), müşterinin TAM o
+ifadesini (substring olarak) yaz. Gün VEYA saat yoksa, ya da geçmiş tarih ise alanı boş
+bırak. UYDURMA — sadece mesajda LİTERAL geçen ifadeyi yaz; ek karakter ekleme,
+tırnaklarla bütünleştirme.`;
 
 export const aiAdapter: AiPort = {
   async writeDraft(req) {

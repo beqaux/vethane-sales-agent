@@ -19,6 +19,8 @@ import {
   CLASSIFICATIONS,
   MSG_STATUSES,
   SUPP_REASONS,
+  PENDING_ACTION_KINDS,
+  PENDING_ACTION_STATUSES,
 } from "../domain/enums";
 
 // E-postalar yazımda küçük-harfe normalize edilir (citext yerine) → unique index case-insensitive davranır.
@@ -31,6 +33,8 @@ export const msgDirEnum = pgEnum("msg_dir", MSG_DIRECTIONS);
 export const classificationEnum = pgEnum("classification", CLASSIFICATIONS);
 export const msgStatusEnum = pgEnum("msg_status", MSG_STATUSES);
 export const suppReasonEnum = pgEnum("supp_reason", SUPP_REASONS);
+export const pendingActionKindEnum = pgEnum("pending_action_kind", PENDING_ACTION_KINDS);
+export const pendingActionStatusEnum = pgEnum("pending_action_status", PENDING_ACTION_STATUSES);
 
 export const leads = pgTable(
   "leads",
@@ -117,4 +121,29 @@ export const events = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("idx_events_type").on(t.type, t.createdAt)],
+);
+
+// ADR-0006 §2.5: Telegram dar-onay yüzeyinde tutulan kararsız aksiyonlar.
+// id'nin ilk 8 char'ı callback_data prefix'i olarak kullanılır (~22 byte toplam,
+// Telegram'ın 64 byte sınırına bol marj). 7 gün TTL; resolve atomic CAS.
+export const pendingActions = pgTable(
+  "pending_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: pendingActionKindEnum("kind").notNull(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    gmailDraftId: text("gmail_draft_id"),
+    gmailThreadId: text("gmail_thread_id"),
+    payload: jsonb("payload").notNull().default({}),
+    status: pendingActionStatusEnum("status").notNull().default("pending"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("idx_pending_status_expires").on(t.status, t.expiresAt),
+    index("idx_pending_lead").on(t.leadId),
+  ],
 );

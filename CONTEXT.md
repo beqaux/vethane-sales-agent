@@ -27,8 +27,8 @@
 | 3 | **Lead kaynağı** | **Yarı-otomatik küratörlük** → lead DB | 250 hedef küçük & sonlu; kalite > nicelik |
 | 4 | **Otonomi** | **Onaylı başla**, düşük-riskli aksiyonları kademeli auto'ya al | Domain itibarı + 250 "hayal hesabı" korunur |
 | 5 | **E-posta altyapı** | info@vethane.com'u **Google Workspace**'e taşı (iCloud'dan) | iCloud'un API'si yok, ToS-lockout riski; Workspace = API + push + Taslaklar-kuyruğu |
-| 6 | **Yüzey** | **Gmail-yerel** (taslak=onay, etiket=pipeline), UI sonra | En hızlı değer, en az bakım; backend aynı kaldığı için UI sonradan eklenir |
-| 7 | **Bildirim** | **Telegram bot** | Bedava, anlık, zengin, ~10 dk kurulum |
+| 6 | **Yüzey** | **Gmail-yerel** (taslak=onay, etiket=pipeline), UI sonra; Telegram dar onay shortcut'u tamamlayıcı (ADR-0006) | En hızlı değer, en az bakım; backend aynı kaldığı için UI sonradan eklenir |
+| 7 | **Bildirim + onay yüzeyi** | **Telegram bot (çift-yön)** | Tek-yön bildirim + dar inline-button onay yüzeyi (3 yer: cold premium taslak, demo saat onayı, belirsiz cevap taslağı). Gmail-yerel ana yüzey kalır. **ADR-0006.** |
 | 8 | **AI & kural** | **Yapısal kaynak + AI sadece ifade eder** + RAG + kod-seviyesi guardrail | Fiyat/söz halüsinasyonu engellenir |
 | 9 | **Uyumluluk** | **B2B muafiyeti** (tacir/esnaf → opt-in yok) + opt-out + suppression + net kimlik, baştan | Yasal + deliverability dostu |
 | 10 | **Outbound akış** | **Çok-dokunuşlu sekans** (ilk + 2-3 takip, 3-5 gün ara) + düşük hacim warmup + karar-verici-bilinçli | Cevapların çoğu takiplere gelir; yeni domain ısınma ister |
@@ -142,8 +142,8 @@ events(id, lead_id, type, payload_json, created_at)   -- audit/gözlemlenebilirl
 
 | Kalem | v1 Varsayılan | Alternatif |
 |---|---|---|
-| Demo randevusu | Telegram bildirim + randevu taslağı, kurucu kapatır | Faz-2'de Google Calendar oto-slot önerisi |
-| Auto'ya geçiş kriteri | ~10 düzeltmesiz onay sonrası (solo fiyat + takip) | Manuel toggle |
+| Demo randevusu | Telegram inline-button onayı (literal saat alıntısı echo'lu confirmation maili, "link 15 dk önce iletilir") | Calendar entegrasyonu demo volume artınca (Faz-3+) — ADR-0006 |
+| Auto'ya geçiş kriteri | ~10 düzeltmesiz onay sonrası (solo fiyat + takip; mid/hospital_**takip** ADR-0006 ile auto'ya alındı, **cold** premium hala manuel + Telegram button) | Manuel toggle |
 | Seed liste | Kurucu 20-50 klinik verir, pipeline büyütür | Tam scraper Faz-2 |
 | Metrikler | DB + günlük Telegram özeti | Web dashboard (sonra) |
 

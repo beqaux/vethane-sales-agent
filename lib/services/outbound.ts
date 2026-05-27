@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { playbookFor } from "../playbooks";
 import { getKnowledge } from "../ai/knowledge";
 import { runGuardrails } from "../guardrails";
@@ -13,6 +14,8 @@ import type {
   EmailProvider,
   AiPort,
 } from "../domain/ports";
+import type { NotifyService } from "./notify";
+import type { PendingActionService } from "./pending-action";
 import type { DraftRequest, OutboundDraft } from "../domain/types";
 
 export interface OutboundDeps {
@@ -23,6 +26,8 @@ export interface OutboundDeps {
   events: EventRepo;
   mail: EmailProvider;
   ai: AiPort;
+  notify: NotifyService;
+  pendingActions: PendingActionService;
 }
 
 export interface OutboundResult {
@@ -71,6 +76,13 @@ export function createOutboundService(deps: OutboundDeps) {
         const g = runGuardrails(draft, { lead, suppressed });
         if (!g.ok) {
           await deps.events.log("guardrail_block", lead.id, { reason: g.reason, action: spec.action });
+          // ADR-0006 §2.3: kurucu Telegram'da görsün — sessiz hata yok.
+          await deps.notify.failure({
+            kind: "guardrail",
+            lead,
+            action: spec.action,
+            reason: g.reason,
+          });
           blocked++;
           continue;
         }
@@ -93,7 +105,42 @@ export function createOutboundService(deps: OutboundDeps) {
             /* etiket opsiyonel */
           }
         }
-        if (auto) await deps.mail.send(created.id);
+        if (auto) {
+          await deps.mail.send(created.id);
+        } else if (spec.action === "mid_cold" || spec.action === "hospital_cold") {
+          // ADR-0006 §2.1 akış #1 — premium cold taslak → Telegram 3-buton onayı.
+          // id pre-gen ile tokenPrefix bilinir, button'lar kurulur, notify atılır,
+          // sonra pending insert edilir (T9 pattern). Notify fail → pending YOK
+          // (kurucu Gmail Drafts'tan manuel atabilir; data integrity bozulmaz).
+          const id = randomUUID();
+          const tokenPrefix = id.slice(0, 8);
+          const sentMsg = await deps.notify.coldDraftApproval({
+            lead,
+            threadId: created.threadId ?? lead.gmailThreadId,
+            subject: draft.subject,
+            body: draft.body,
+            currentStep: lead.seq.currentStep,
+            tokenPrefix,
+          });
+          if (sentMsg) {
+            await deps.pendingActions.create({
+              id,
+              kind: "send_draft",
+              leadId: lead.id,
+              gmailDraftId: created.id,
+              gmailThreadId: created.threadId ?? lead.gmailThreadId,
+              payload: {
+                action: spec.action,
+                telegram: { chatId: sentMsg.chatId, messageId: sentMsg.messageId },
+              },
+            });
+            await deps.events.log("cold_draft_pending", lead.id, {
+              pendingId: id,
+              action: spec.action,
+              draftId: created.id,
+            });
+          }
+        }
 
         await deps.msgs.add({
           leadId: lead.id,

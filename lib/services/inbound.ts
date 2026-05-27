@@ -1,10 +1,15 @@
+import { randomUUID } from "node:crypto";
 import { playbookFor, detectPremiumSignal } from "../playbooks";
 import { getKnowledge } from "../ai/knowledge";
 import { runGuardrails } from "../guardrails";
 import { onReply, onOptout, reschedule } from "./sequence";
-import { ACTION_MODES } from "../config/runtime";
+import { ACTION_MODES, BRAND } from "../config/runtime";
 import { emailDomain, isFreeMailDomain } from "../util/email-parse";
 import { deriveSegment, deriveTier } from "../util/segment";
+import {
+  extractFirstName,
+  renderConfirmTemplate,
+} from "../util/demo-template";
 import type { NotifyEnrichment } from "./notify";
 import type {
   LeadRepo,
@@ -16,6 +21,7 @@ import type {
   AiPort,
 } from "../domain/ports";
 import type { NotifyService } from "./notify";
+import type { PendingActionService } from "./pending-action";
 import type { InboundMessage, DraftRequest, OutboundDraft } from "../domain/types";
 import type { Segment, Classification, ActionType } from "../domain/enums";
 
@@ -30,6 +36,7 @@ export interface InboundDeps {
   mail: EmailProvider;
   ai: AiPort;
   notify: NotifyService;
+  pendingActions: PendingActionService;
 }
 
 function labelFor(cls: Classification): string {
@@ -69,6 +76,14 @@ export function createInboundService(deps: InboundDeps) {
     if (await deps.msgs.existsInbound(msg.gmailMessageId)) return; // dedup
 
     const cls = await deps.ai.classify(msg);
+    // ADR-0006 §2.4: substring guardrail — AI uydurma proposedTime drop.
+    if (cls.proposedTime && !msg.body.includes(cls.proposedTime.raw)) {
+      await deps.events.log("classify_propose_time_hallucination", null, {
+        raw: cls.proposedTime.raw,
+        cls: cls.cls,
+      });
+      cls.proposedTime = undefined;
+    }
     let lead =
       (msg.threadId ? await deps.leads.byThread(msg.threadId) : null) ??
       (await deps.leads.byEmail(msg.fromEmail));
@@ -145,7 +160,13 @@ export function createInboundService(deps: InboundDeps) {
       }
     }
 
-    if (cls.confidence < CONF_THRESHOLD) {
+    // ADR-0006 §2.1 akış #5: low-confidence + plan.sendDraft → T11'de pending +
+    // 3-buton mesaj draft create'ten SONRA atılır. Hot "❓ Belirsiz" notify
+    // burada erken atılmaz — sadece sendDraft=false ise (draft yok, button da yok)
+    // yine info notify atılır.
+    const willTryUncertainButton =
+      cls.confidence < CONF_THRESHOLD && plan.sendDraft;
+    if (cls.confidence < CONF_THRESHOLD && !plan.sendDraft) {
       await deps.notify.hot("❓ Belirsiz cevap — elle bak", lead, msg, { cls });
     }
 
@@ -160,8 +181,61 @@ export function createInboundService(deps: InboundDeps) {
 
     if (plan.newDurum) await deps.leads.updateDurum(lead.id, plan.newDurum);
 
+    // ADR-0006 §2.1 akış #3 — demo_followup + literal proposedTime → pending_action + 2-buton.
+    // demoTimeApproval atılırsa eski "💬 Demo sonrası mesaj" hot notify atlanır
+    // (kurucu zaten buton mesajını alıyor — duplicate notify gerekmez).
+    const isDemoTimePath =
+      plan.action === "demo_followup" &&
+      cls.proposedTime != null &&
+      cls.proposedTime.raw.length > 0;
+    let demoTimeHandled = false;
+    if (isDemoTimePath && cls.proposedTime) {
+      const { pending, tokenPrefix } = await deps.pendingActions.create({
+        kind: "confirm_demo_time",
+        leadId: lead.id,
+        gmailThreadId: msg.threadId,
+        payload: {
+          proposedTimeRaw: cls.proposedTime.raw,
+          fromEmail: msg.fromEmail,
+          headerMessageId: msg.headerMessageId,
+          subject: msg.subject,
+        },
+      });
+      const ad = extractFirstName(lead, msg.fromEmail);
+      const previewBody = renderConfirmTemplate(
+        ad,
+        cls.proposedTime.raw,
+        BRAND.senderName,
+      );
+      const sent = await deps.notify.demoTimeApproval({
+        lead,
+        fromEmail: msg.fromEmail,
+        rawTime: cls.proposedTime.raw,
+        previewBody,
+        threadId: msg.threadId,
+        tokenPrefix,
+      });
+      if (sent) {
+        // Telegram lokasyonu pending.payload'a yaz — T8 callback edit'te kullanır.
+        await deps.pendingActions.updatePayload(pending.id, {
+          telegram: { chatId: sent.chatId, messageId: sent.messageId },
+        });
+        await deps.events.log("demo_time_pending", lead.id, {
+          pendingId: pending.id,
+          raw: cls.proposedTime.raw,
+        });
+        demoTimeHandled = true;
+      } else {
+        // Notify atılamadı (Telegram down vs.) — pending'i cancel et,
+        // fall-through eski hot notify'a düşer.
+        await deps.pendingActions.resolve(pending.id, "cancelled");
+      }
+    }
+
     // Bildirim: yeni lead VE/VEYA plan.notify durumunda — tek bildirim, birleşik label.
-    if (isNewLead || plan.notify) {
+    // demoTimeApproval (#3) ya da uncertain button (#5) atılacaksa hot notify atlanır
+    // (duplicate engeli — button mesajı zaten her şeyi gösterir).
+    if (!demoTimeHandled && !willTryUncertainButton && (isNewLead || plan.notify)) {
       const premiumMatch = segment === "unknown" ? detectPremiumSignal({ lead, msg, cls }) : false;
       const label = notifyLabel({
         isNewLead,
@@ -207,6 +281,13 @@ export function createInboundService(deps: InboundDeps) {
       const g = runGuardrails(draft, { lead, suppressed });
       if (!g.ok) {
         await deps.events.log("guardrail_block", lead.id, { reason: g.reason, action: plan.action });
+        // ADR-0006 §2.3: kurucu Telegram'da görsün — sessiz hata yok.
+        await deps.notify.failure({
+          kind: "guardrail",
+          lead,
+          action: plan.action,
+          reason: g.reason,
+        });
       } else {
         const replyThread = msg.threadId || lead.gmailThreadId;
         const created = await deps.mail.createDraft(
@@ -220,7 +301,54 @@ export function createInboundService(deps: InboundDeps) {
           await deps.leads.setThread(lead.id, created.threadId);
         }
         const auto = ACTION_MODES[plan.action] === "auto" && cls.confidence >= CONF_THRESHOLD;
-        if (auto) await deps.mail.send(created.id);
+        if (auto) {
+          await deps.mail.send(created.id);
+        } else if (willTryUncertainButton) {
+          // ADR-0006 §2.1 akış #5 — uncertain reply pending + 3-buton notify.
+          // Send/cancel callback'leri T10 send_draft dispatcher'ından reuse.
+          const id = randomUUID();
+          const tokenPrefix = id.slice(0, 8);
+          const sentMsg = await deps.notify.uncertainReplyApproval({
+            lead,
+            cls,
+            msgBody: msg.body,
+            draftBody: draft.body,
+            threadId: created.threadId ?? msg.threadId,
+            tokenPrefix,
+          });
+          if (sentMsg) {
+            await deps.pendingActions.create({
+              id,
+              kind: "send_draft",
+              leadId: lead.id,
+              gmailDraftId: created.id,
+              gmailThreadId: created.threadId ?? msg.threadId,
+              payload: {
+                action: plan.action,
+                classification: cls.cls,
+                confidence: cls.confidence,
+                telegram: {
+                  chatId: sentMsg.chatId,
+                  messageId: sentMsg.messageId,
+                },
+              },
+            });
+            await deps.events.log("uncertain_reply_pending", lead.id, {
+              pendingId: id,
+              action: plan.action,
+              confidence: cls.confidence,
+              draftId: created.id,
+            });
+          } else {
+            // Telegram fail — kurucu draft'ı kaçırmasın diye fall-back info notify.
+            await deps.notify.hot(
+              "❓ Belirsiz cevap — Telegram notify atılamadı, Gmail Drafts'ta",
+              lead,
+              msg,
+              { cls },
+            );
+          }
+        }
         await deps.msgs.add({
           leadId: lead.id,
           direction: "out",
@@ -250,6 +378,11 @@ export function createInboundService(deps: InboundDeps) {
             from: msg.fromEmail,
             error: err.message ?? String(e),
             cause: err.cause ? String(err.cause).slice(0, 500) : undefined,
+          });
+          // ADR-0006 §2.3: sessiz hata yok — kurucu Telegram'da görür.
+          await deps.notify.failure({
+            kind: "error",
+            reason: `inbound ${msg.fromEmail}: ${err.message ?? String(e)}`,
           });
         }
       }

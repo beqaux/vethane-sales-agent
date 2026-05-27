@@ -67,7 +67,20 @@ function makeDeps(
       classify: vi.fn().mockResolvedValue({ cls: "fiyat", confidence: 0.9 }),
       writeDraft: vi.fn().mockResolvedValue({ subject: "Re", body: "yanıt" }),
     },
-    notify: { hot: vi.fn() },
+    notify: {
+      hot: vi.fn(),
+      failure: vi.fn(),
+      demoTimeApproval: vi.fn(),
+      coldDraftApproval: vi.fn(),
+      uncertainReplyApproval: vi.fn(),
+    },
+    pendingActions: {
+      create: vi.fn().mockResolvedValue({ pending: { id: "p-1" }, tokenPrefix: "p-1aaaa1" }),
+      resolve: vi.fn(),
+      updatePayload: vi.fn(),
+      expireDue: vi.fn(),
+      tokenPrefix: (id: string) => id.slice(0, 8),
+    },
   };
 }
 
