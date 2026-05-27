@@ -39,6 +39,7 @@ export const outboundService = createOutboundService({
   mail: gmailAdapter,
   ai: aiAdapter,
   notify: notifyService,
+  pendingActions: pendingActionService,
 });
 
 export const inboundService = createInboundService({

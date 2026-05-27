@@ -132,6 +132,7 @@ const outbound = createOutboundService({
   mail,
   ai,
   notify,
+  pendingActions,
 } as unknown as OutboundDeps);
 
 const inbound = createInboundService({
