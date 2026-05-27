@@ -23,6 +23,8 @@ export const ACTION_MODES: Record<ActionType, "manual" | "auto"> = {
   // bildirim de gidiyor (kurucu Telegram'dan takip eder).
   mid_reply: "auto",
   hospital_reply: "auto",
+  // Demo onayı SONRASI takip ("teşekkürler", "OK" gibi): bot karışmaz, kurucu görür.
+  demo_followup: "manual",
   // Cold/takip premium hala manuel — ilk temas tonu kurucu kontrolünde.
   mid_cold: "manual",
   mid_takip: "manual",

@@ -252,4 +252,40 @@ describe("InboundService.handle", () => {
     expect(deps.notify.hot).not.toHaveBeenCalled();
     expect(deps.mail.createDraft).not.toHaveBeenCalled();
   });
+
+  it("durum=demo_istedi + ilgili cevap → draft YOK, sadece bildirim", async () => {
+    // Müşteri demo'yu onayladı, sonra "teşekkür ettim" yazdı. Bot intro tekrarlamamalı.
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({ cls: "ilgili", segment: "mid", lead });
+    await run(deps);
+    expect(deps.mail.createDraft).not.toHaveBeenCalled();
+    expect(deps.notify.hot).toHaveBeenCalled();
+    const labels = (deps.notify.hot as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    expect(labels.some((l: string) => l.includes("Demo sonrası mesaj"))).toBe(true);
+  });
+
+  it("durum=demo_istedi + ilgili → durum gerilemez (newDurum yok)", async () => {
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({ cls: "ilgili", segment: "mid", lead });
+    await run(deps);
+    expect(deps.leads.updateDurum).not.toHaveBeenCalled();
+  });
+
+  it("durum=demo_istedi + cikis → opt-out hâlâ işler (common path)", async () => {
+    // Demo onaylandıktan sonra bile çıkış talebi gelirse normal cikis_reply tetiklenir.
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({
+      cls: "cikis",
+      segment: "mid",
+      lead,
+      aiBody: "Sizi listeden çıkardım.",
+    });
+    await run(deps);
+    expect(deps.supp.add).toHaveBeenCalled();
+    expect(deps.leads.updateDurum).toHaveBeenCalledWith("1", "cikti");
+    expect(deps.mail.createDraft).toHaveBeenCalled();
+  });
 });

@@ -145,6 +145,22 @@ function buildReplyFor(
   const common = commonReply(cls.cls);
   if (common) return common;
 
+  // Demo zaten onaylanmış (durum=demo_istedi) — bot susar, kurucu Telegram'dan
+  // manuel takip eder. "Teşekkür ettim" / "OK" gibi mesajlara intro tekrarlamasın.
+  // cikis common'da yakalandığı için bu noktaya gelmemeli; başka cls'ler sessize alınır.
+  // newDurum YOK → demo_istedi state'i bozulmasın (mid_reply'ın cevap_geldi'ye düşürme bug'ı).
+  if (lead.durum === "demo_istedi") {
+    return {
+      action: "demo_followup",
+      goal: "Demo onayı sonrası takip — bot mesaj atmaz, kurucu Telegram'dan görür.",
+      guidance: "",
+      sendDraft: false,
+      notify: true,
+      stopSequence: true,
+      suppress: false,
+    };
+  }
+
   // Web inbound + unknown + fiyat → premium detection (TG1)
   if (segment === "unknown" && cls.cls === "fiyat") {
     const isPremium = detectPremiumSignal({ lead, msg, cls });

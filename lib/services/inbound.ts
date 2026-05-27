@@ -17,7 +17,7 @@ import type {
 } from "../domain/ports";
 import type { NotifyService } from "./notify";
 import type { InboundMessage, DraftRequest, OutboundDraft } from "../domain/types";
-import type { Segment, Classification } from "../domain/enums";
+import type { Segment, Classification, ActionType } from "../domain/enums";
 
 const CONF_THRESHOLD = 0.5;
 
@@ -44,8 +44,13 @@ function notifyLabel(opts: {
   cls: Classification;
   segment: Segment;
   premiumMatch: boolean;
+  action?: ActionType;
 }): string {
   const prefix = opts.isNewLead ? "🆕 Web inbound · " : "";
+  // Demo sonrası takip mesajı (durum=demo_istedi) — kurucu için ayrı etiket.
+  if (opts.action === "demo_followup") {
+    return `${prefix}💬 Demo sonrası mesaj — kurucu takip etsin`;
+  }
   if (opts.cls === "demo") return `${prefix}🔥 DEMO İSTEĞİ`;
   if (opts.segment === "mid" || opts.segment === "hospital") {
     return `${prefix}🔥 Premium yanıt (${opts.segment})`;
@@ -158,7 +163,13 @@ export function createInboundService(deps: InboundDeps) {
     // Bildirim: yeni lead VE/VEYA plan.notify durumunda — tek bildirim, birleşik label.
     if (isNewLead || plan.notify) {
       const premiumMatch = segment === "unknown" ? detectPremiumSignal({ lead, msg, cls }) : false;
-      const label = notifyLabel({ isNewLead, cls: cls.cls, segment, premiumMatch });
+      const label = notifyLabel({
+        isNewLead,
+        cls: cls.cls,
+        segment,
+        premiumMatch,
+        action: plan.action,
+      });
       const enrich: NotifyEnrichment = {
         cls,
         premiumMatch: segment === "unknown" ? premiumMatch : undefined,
