@@ -11,10 +11,21 @@ import { telegramAdapter } from "./adapters/telegram";
 import { createOutboundService } from "./services/outbound";
 import { createInboundService } from "./services/inbound";
 import { createNotifyService } from "./services/notify";
+import { createTelegramCallbackService } from "./services/telegram-callback";
 
 export { telegramAdapter, pendingActionRepo, eventRepo };
 
 export const notifyService = createNotifyService(telegramAdapter);
+
+export const telegramCallbackService = createTelegramCallbackService({
+  pendingActions: pendingActionRepo,
+  leads: leadRepo,
+  supp: suppressionRepo,
+  msgs: messageRepo,
+  events: eventRepo,
+  mail: gmailAdapter,
+  notify: telegramAdapter,
+});
 
 export const outboundService = createOutboundService({
   leads: leadRepo,
