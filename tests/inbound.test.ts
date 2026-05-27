@@ -95,7 +95,10 @@ function makeDeps(opts: {
       }),
       writeDraft: vi.fn().mockResolvedValue({ subject: "Re", body: opts.aiBody ?? "yanıt" }),
     },
-    notify: { hot: vi.fn().mockResolvedValue(undefined) },
+    notify: {
+      hot: vi.fn().mockResolvedValue(undefined),
+      failure: vi.fn().mockResolvedValue(undefined),
+    },
   };
 }
 

@@ -67,7 +67,7 @@ function makeDeps(
       classify: vi.fn().mockResolvedValue({ cls: "fiyat", confidence: 0.9 }),
       writeDraft: vi.fn().mockResolvedValue({ subject: "Re", body: "yanıt" }),
     },
-    notify: { hot: vi.fn() },
+    notify: { hot: vi.fn(), failure: vi.fn() },
   };
 }
 

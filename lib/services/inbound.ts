@@ -207,6 +207,13 @@ export function createInboundService(deps: InboundDeps) {
       const g = runGuardrails(draft, { lead, suppressed });
       if (!g.ok) {
         await deps.events.log("guardrail_block", lead.id, { reason: g.reason, action: plan.action });
+        // ADR-0006 §2.3: kurucu Telegram'da görsün — sessiz hata yok.
+        await deps.notify.failure({
+          kind: "guardrail",
+          lead,
+          action: plan.action,
+          reason: g.reason,
+        });
       } else {
         const replyThread = msg.threadId || lead.gmailThreadId;
         const created = await deps.mail.createDraft(
@@ -250,6 +257,11 @@ export function createInboundService(deps: InboundDeps) {
             from: msg.fromEmail,
             error: err.message ?? String(e),
             cause: err.cause ? String(err.cause).slice(0, 500) : undefined,
+          });
+          // ADR-0006 §2.3: sessiz hata yok — kurucu Telegram'da görür.
+          await deps.notify.failure({
+            kind: "error",
+            reason: `inbound ${msg.fromEmail}: ${err.message ?? String(e)}`,
           });
         }
       }
