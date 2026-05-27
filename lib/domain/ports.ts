@@ -31,6 +31,10 @@ export interface EmailProvider {
   listRecentInbound(maxResults?: number): Promise<InboundMessage[]>;
   addLabel(threadId: string, label: string): Promise<void>;
   watch(): Promise<{ historyId: string; expiration: number }>;
+  /** ADR-0006 §2.7 E2 — draft mevcut mu? Yoksa exception fırlatır. */
+  getDraft(draftId: string): Promise<{ id: string; threadId: string | null }>;
+  /** ADR-0006 §2.1 akış #1 — ❌ İptal'de kullanılır. */
+  deleteDraft(draftId: string): Promise<void>;
 }
 
 export interface AiPort {

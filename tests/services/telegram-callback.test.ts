@@ -63,6 +63,8 @@ function makeDeps() {
     listRecentInbound: vi.fn(),
     addLabel: vi.fn(),
     watch: vi.fn(),
+    getDraft: vi.fn().mockResolvedValue({ id: "draft-x", threadId: "thr-x" }),
+    deleteDraft: vi.fn().mockResolvedValue(undefined),
   };
   const events = { log: vi.fn().mockResolvedValue(undefined) };
   return {
@@ -432,6 +434,276 @@ describe("telegramCallbackService.handle — confirm_demo_time", () => {
       "Re: Demo görüşme",
       expect.any(String),
       expect.anything(),
+    );
+  });
+});
+
+// ADR-0006 §2.1 akış #1 (#5 reuse) — T10 send_draft callback
+describe("telegramCallbackService.handle — send_draft (send/cancel)", () => {
+  function leadFixture(
+    durum:
+      | "sekansta"
+      | "demo_istedi"
+      | "cikti"
+      | "kaybedildi"
+      | "cevap_geldi" = "sekansta",
+  ) {
+    return {
+      id: "lead-2",
+      kurumAdi: "Premium Klinik",
+      sehir: "Ankara",
+      tur: "hastane" as const,
+      vetSayisi: 8,
+      segment: "hospital" as const,
+      tier: 1 as const,
+      email: "owner@premium.com",
+      emailConfidence: null,
+      website: null,
+      placeId: null,
+      phone: null,
+      instagram: null,
+      kararVerici: null,
+      kaynak: null,
+      durum,
+      gmailThreadId: "thr-2",
+      alternateEmails: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  function coldPending() {
+    return pending({
+      kind: "send_draft",
+      leadId: "lead-2",
+      gmailDraftId: "draft-cold-1",
+      payload: {
+        action: "mid_cold",
+        telegram: { chatId: "12345", messageId: 88 },
+      },
+    });
+  }
+
+  // ---- send verb ----
+  it("send: happy path → getDraft + CAS + send + edit ✅ + ack + event", async () => {
+    const deps = makeDeps();
+    deps.pendingActions._set(coldPending());
+    deps.leads.byId.mockResolvedValue(leadFixture());
+    deps.mail.getDraft = vi.fn().mockResolvedValue({ id: "draft-cold-1" });
+    const svc = buildSvc(deps);
+    await svc.handle(cb({ data: "act:abcdef12:send" }));
+
+    expect(deps.mail.getDraft).toHaveBeenCalledWith("draft-cold-1");
+    expect(deps.pendingActions.resolve).toHaveBeenCalledWith(
+      expect.any(String),
+      "resolved",
+    );
+    expect(deps.mail.send).toHaveBeenCalledWith("draft-cold-1");
+    expect(deps.notify.edit).toHaveBeenCalledWith(
+      "12345",
+      88,
+      expect.stringMatching(/^✅ Gönderildi/),
+    );
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "cold_draft_sent_via_telegram",
+      "lead-2",
+      expect.objectContaining({ draftId: "draft-cold-1" }),
+    );
+  });
+
+  it("send: E1 durum=cevap_geldi → refuse + edit + cancelled + deleteDraft", async () => {
+    const deps = makeDeps();
+    deps.pendingActions._set(coldPending());
+    deps.leads.byId.mockResolvedValue(leadFixture("cevap_geldi"));
+    deps.mail.getDraft = vi.fn();
+    deps.mail.deleteDraft = vi.fn().mockResolvedValue(undefined);
+    const svc = buildSvc(deps);
+    await svc.handle(cb({ data: "act:abcdef12:send" }));
+    expect(deps.mail.send).not.toHaveBeenCalled();
+    expect(deps.mail.deleteDraft).toHaveBeenCalledWith("draft-cold-1");
+    expect(deps.pendingActions.resolve).toHaveBeenCalledWith(
+      expect.any(String),
+      "cancelled",
+    );
+    expect(deps.notify.edit).toHaveBeenCalledWith(
+      "12345",
+      88,
+      expect.stringMatching(/Müşteri arada cevap verdi/),
+    );
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "send_draft_skipped_reply_arrived",
+      "lead-2",
+      expect.any(Object),
+    );
+  });
+
+  it("send: E2 draft Gmail'de yok → refuse + edit + cancelled", async () => {
+    const deps = makeDeps();
+    deps.pendingActions._set(coldPending());
+    deps.leads.byId.mockResolvedValue(leadFixture());
+    deps.mail.getDraft = vi.fn().mockRejectedValue(new Error("404 not found"));
+    deps.mail.deleteDraft = vi.fn().mockResolvedValue(undefined);
+    const svc = buildSvc(deps);
+    await svc.handle(cb({ data: "act:abcdef12:send" }));
+    expect(deps.mail.send).not.toHaveBeenCalled();
+    expect(deps.pendingActions.resolve).toHaveBeenCalledWith(
+      expect.any(String),
+      "cancelled",
+    );
+    expect(deps.notify.edit).toHaveBeenCalledWith(
+      "12345",
+      88,
+      expect.stringMatching(/Gmail'de bulunamadı/),
+    );
+  });
+
+  it("send: E5 durum=kaybedildi → refuse + cancelled + log", async () => {
+    const deps = makeDeps();
+    deps.pendingActions._set(coldPending());
+    deps.leads.byId.mockResolvedValue(leadFixture("kaybedildi"));
+    deps.mail.getDraft = vi.fn();
+    deps.mail.deleteDraft = vi.fn();
+    const svc = buildSvc(deps);
+    await svc.handle(cb({ data: "act:abcdef12:send" }));
+    expect(deps.mail.send).not.toHaveBeenCalled();
+    expect(deps.notify.edit).toHaveBeenCalledWith(
+      "12345",
+      88,
+      expect.stringMatching(/Lead durumu değişmiş/),
+    );
+  });
+
+  it("send: E6 suppression → refuse + cancelled", async () => {
+    const deps = makeDeps();
+    deps.pendingActions._set(coldPending());
+    deps.leads.byId.mockResolvedValue(leadFixture());
+    deps.supp.has = vi.fn().mockResolvedValue(true);
+    deps.mail.getDraft = vi.fn();
+    deps.mail.deleteDraft = vi.fn();
+    const svc = buildSvc(deps);
+    await svc.handle(cb({ data: "act:abcdef12:send" }));
+    expect(deps.mail.send).not.toHaveBeenCalled();
+    expect(deps.notify.edit).toHaveBeenCalledWith(
+      "12345",
+      88,
+      expect.stringMatching(/suppression/i),
+    );
+  });
+
+  it("send: çift tap (CAS kaybeder) → 'Zaten yapıldı'", async () => {
+    const deps = makeDeps();
+    deps.pendingActions._set(coldPending());
+    deps.leads.byId.mockResolvedValue(leadFixture());
+    deps.mail.getDraft = vi.fn().mockResolvedValue({ id: "draft-cold-1" });
+    deps.pendingActions.resolve = vi.fn().mockResolvedValue(false);
+    const svc = buildSvc(deps);
+    await svc.handle(cb({ data: "act:abcdef12:send" }));
+    expect(deps.mail.send).not.toHaveBeenCalled();
+    expect(deps.notify.answerCallback).toHaveBeenCalledWith("cb-1", {
+      text: "Zaten yapıldı",
+    });
+  });
+
+  it("send: E8 mail.send fail → edit ❌ + alert + event (pending IS resolved)", async () => {
+    const deps = makeDeps();
+    deps.pendingActions._set(coldPending());
+    deps.leads.byId.mockResolvedValue(leadFixture());
+    deps.mail.getDraft = vi.fn().mockResolvedValue({ id: "draft-cold-1" });
+    deps.mail.send = vi.fn().mockRejectedValue(new Error("network 500"));
+    const svc = buildSvc(deps);
+    await svc.handle(cb({ data: "act:abcdef12:send" }));
+    expect(deps.notify.edit).toHaveBeenCalledWith(
+      "12345",
+      88,
+      expect.stringMatching(/Gönderim başarısız/),
+    );
+    expect(deps.notify.answerCallback).toHaveBeenCalledWith(
+      "cb-1",
+      expect.objectContaining({ alert: true }),
+    );
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "send_draft_send_failed",
+      "lead-2",
+      expect.objectContaining({ error: "network 500" }),
+    );
+  });
+
+  // ---- cancel verb ----
+  it("cancel: happy path → CAS cancelled + deleteDraft + edit ❌ + ack + event", async () => {
+    const deps = makeDeps();
+    deps.pendingActions._set(coldPending());
+    deps.mail.deleteDraft = vi.fn().mockResolvedValue(undefined);
+    const svc = buildSvc(deps);
+    await svc.handle(cb({ data: "act:abcdef12:cancel" }));
+    expect(deps.pendingActions.resolve).toHaveBeenCalledWith(
+      expect.any(String),
+      "cancelled",
+    );
+    expect(deps.mail.deleteDraft).toHaveBeenCalledWith("draft-cold-1");
+    expect(deps.notify.edit).toHaveBeenCalledWith(
+      "12345",
+      88,
+      expect.stringMatching(/^❌ İptal edildi/),
+    );
+    expect(deps.notify.answerCallback).toHaveBeenCalledWith("cb-1", {
+      text: "İptal edildi",
+    });
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "cold_draft_cancelled_via_telegram",
+      "lead-2",
+      expect.any(Object),
+    );
+  });
+
+  it("cancel: deleteDraft fail → yine edit + ack (best-effort) + delete_failed log", async () => {
+    const deps = makeDeps();
+    deps.pendingActions._set(coldPending());
+    deps.mail.deleteDraft = vi.fn().mockRejectedValue(new Error("404"));
+    const svc = buildSvc(deps);
+    await svc.handle(cb({ data: "act:abcdef12:cancel" }));
+    expect(deps.notify.edit).toHaveBeenCalledWith(
+      "12345",
+      88,
+      expect.stringMatching(/İptal edildi/),
+    );
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "send_draft_delete_failed",
+      "lead-2",
+      expect.objectContaining({ error: "404" }),
+    );
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "cold_draft_cancelled_via_telegram",
+      "lead-2",
+      expect.any(Object),
+    );
+  });
+
+  it("cancel: çift tap → 'Zaten yapıldı' + deleteDraft ATILMAZ", async () => {
+    const deps = makeDeps();
+    deps.pendingActions._set(coldPending());
+    deps.pendingActions.resolve = vi.fn().mockResolvedValue(false);
+    deps.mail.deleteDraft = vi.fn();
+    const svc = buildSvc(deps);
+    await svc.handle(cb({ data: "act:abcdef12:cancel" }));
+    expect(deps.mail.deleteDraft).not.toHaveBeenCalled();
+    expect(deps.notify.answerCallback).toHaveBeenCalledWith("cb-1", {
+      text: "Zaten yapıldı",
+    });
+  });
+
+  it("send: uncertain_reply action (T11) → uncertain_reply_sent_via_telegram event", async () => {
+    const p = coldPending();
+    p.payload = { ...(p.payload as Record<string, unknown>), action: "mid_reply" };
+    const deps = makeDeps();
+    deps.pendingActions._set(p);
+    deps.leads.byId.mockResolvedValue(leadFixture());
+    deps.mail.getDraft = vi.fn().mockResolvedValue({ id: "draft-cold-1" });
+    const svc = buildSvc(deps);
+    await svc.handle(cb({ data: "act:abcdef12:send" }));
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "uncertain_reply_sent_via_telegram",
+      "lead-2",
+      expect.any(Object),
     );
   });
 });
