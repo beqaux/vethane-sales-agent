@@ -40,6 +40,34 @@ export function extractPlainText(payload: GmailPart | null | undefined): string 
   return "";
 }
 
+// "27 May 2026 Çar, 01:54 tarihinde ... yazdı:", "On Mon, ... wrote:", Outlook "From: X" header bloğu.
+const QUOTE_ATTRIBUTION = [
+  /tarihinde\s+.*\s+yazd[ıi]\s*:?\s*$/i, // TR Gmail
+  /^\s*on\s.+\swrote\s*:?\s*$/i, // EN Gmail
+  /^\s*-{2,}\s*original message\s*-{2,}\s*$/i, // Outlook eski
+  /^\s*from:\s+.+/i, // Outlook header bloğu başı
+  /^\s*\d{1,2}[./-]\d{1,2}[./-]\d{2,4}.+?yazd[ıi]\s*:?\s*$/i, // alternatif TR format
+];
+
+/**
+ * Gmail / Outlook tarzı alıntılanmış cevap metnini siler.
+ * "3 veteriner var\n\nVethane <info@vethane.com>, 27 May 2026 ... şunu yazdı:\n> Merhaba..."
+ * → "3 veteriner var"
+ *
+ * AI sınıflayıcı/üretici quoted geçmişi GÖRMEZ → yalnız kullanıcının asıl yanıtına bakar.
+ */
+export function stripQuotedReply(body: string): string {
+  if (!body) return body;
+  const lines = body.split(/\r?\n/);
+  const out: string[] = [];
+  for (const line of lines) {
+    if (line.trimStart().startsWith(">")) break;
+    if (QUOTE_ATTRIBUTION.some((re) => re.test(line))) break;
+    out.push(line);
+  }
+  return out.join("\n").replace(/\s+$/g, "").trim();
+}
+
 function stripHtml(s: string): string {
   return s
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
