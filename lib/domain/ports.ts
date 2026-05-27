@@ -5,6 +5,7 @@ import type {
   InboundMessage,
   DraftRequest,
   Candidate,
+  PendingAction,
 } from "./types";
 import type {
   Classification,
@@ -13,6 +14,7 @@ import type {
   SuppReason,
   Tier,
   EmailConfidence,
+  PendingActionStatus,
 } from "./enums";
 
 // --- Dış servis portları (Adapter pattern, IMPL §2.1) ---
@@ -43,8 +45,39 @@ export interface AiPort {
   }>;
 }
 
+// Telegram inline keyboard (ADR-0006 §2.6).
+export type TelegramButton =
+  | { text: string; callback_data: string }
+  | { text: string; url: string };
+export type ButtonRow = TelegramButton[];
+
+export interface NotifyOptions {
+  buttons?: ButtonRow[];
+}
+
+export interface NotifyMessage {
+  messageId: number;
+  chatId: string;
+}
+
 export interface NotifyPort {
-  notify(text: string): Promise<void>;
+  /**
+   * Telegram'a mesaj atar; opsiyonel inline keyboard buton matrisi.
+   * Dönüş: edit/cleanup için chatId+messageId.
+   */
+  notify(text: string, opts?: NotifyOptions): Promise<NotifyMessage>;
+  /** Mevcut bir mesajı edit'ler (button kaldırmak veya status satırı eklemek için). */
+  edit(
+    chatId: string,
+    messageId: number,
+    text: string,
+    opts?: NotifyOptions,
+  ): Promise<void>;
+  /** Telegram'a "ack" + opsiyonel toast/alert. */
+  answerCallback(
+    callbackQueryId: string,
+    opts?: { text?: string; alert?: boolean },
+  ): Promise<void>;
 }
 
 export interface PlacesPort {
@@ -94,4 +127,33 @@ export interface SuppressionRepo {
 
 export interface EventRepo {
   log(type: string, leadId: string | null, payload?: unknown): Promise<void>;
+}
+
+// ADR-0006 §2.5 — Telegram pending action repo.
+export interface PendingActionRepo {
+  /**
+   * Yeni pending aksiyon yaratır. `id` opsiyonel — caller önceden generate edebilir
+   * (notify mesajı atılırken callback_data prefix'i bilinmek için).
+   */
+  create(
+    input: Omit<PendingAction, "id" | "createdAt" | "resolvedAt" | "status"> & {
+      id?: string;
+      status?: PendingActionStatus;
+    },
+  ): Promise<PendingAction>;
+  byId(id: string): Promise<PendingAction | null>;
+  /** id::text LIKE prefix||'%' AND status='pending' LIMIT 1 — 8-char prefix kullanılır. */
+  byPrefix(prefix: string): Promise<PendingAction | null>;
+  /**
+   * Atomic CAS: status='pending' iken hedef statüsüne geçer.
+   * Concurrent çağrılarda yarış kazananı bir tanedir — diğerlerine `false` döner.
+   */
+  resolve(
+    id: string,
+    finalStatus: "resolved" | "cancelled" | "expired",
+  ): Promise<boolean>;
+  /** payload jsonb'sini patch'ler (mevcut anahtarlar üzerine yazılır, kalanlar korunur). */
+  updatePayload(id: string, patch: Record<string, unknown>): Promise<void>;
+  /** expires_at < now && status='pending' → 'expired'; sayı döner. */
+  expireDue(now: Date): Promise<number>;
 }

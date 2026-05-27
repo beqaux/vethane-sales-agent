@@ -68,3 +68,19 @@ export const ACTION_TYPES = [
   "cikis_reply",
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
+
+// Telegram callback yüzeyinde tutulan pending aksiyon tipleri (ADR-0006 §2.5).
+export const PENDING_ACTION_KINDS = [
+  "send_draft",
+  "cancel_draft",
+  "confirm_demo_time",
+] as const;
+export type PendingActionKind = (typeof PENDING_ACTION_KINDS)[number];
+
+export const PENDING_ACTION_STATUSES = [
+  "pending",
+  "resolved",
+  "expired",
+  "cancelled",
+] as const;
+export type PendingActionStatus = (typeof PENDING_ACTION_STATUSES)[number];
