@@ -12,10 +12,13 @@ import { createOutboundService } from "./services/outbound";
 import { createInboundService } from "./services/inbound";
 import { createNotifyService } from "./services/notify";
 import { createTelegramCallbackService } from "./services/telegram-callback";
+import { createPendingActionService } from "./services/pending-action";
 
 export { telegramAdapter, pendingActionRepo, eventRepo };
 
 export const notifyService = createNotifyService(telegramAdapter);
+
+export const pendingActionService = createPendingActionService(pendingActionRepo);
 
 export const telegramCallbackService = createTelegramCallbackService({
   pendingActions: pendingActionRepo,
