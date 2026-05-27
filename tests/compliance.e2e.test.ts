@@ -107,7 +107,21 @@ const ai = {
   classify: async () => classifyResult,
 };
 
-const notify = { hot: async () => {}, failure: async () => {} };
+const notify = {
+  hot: async () => {},
+  failure: async () => {},
+  demoTimeApproval: async () => null,
+  coldDraftApproval: async () => null,
+  uncertainReplyApproval: async () => null,
+};
+
+const pendingActions = {
+  create: async () => ({ pending: { id: "p-1" }, tokenPrefix: "p-1aaaa1" }),
+  resolve: async () => true,
+  updatePayload: async () => undefined,
+  expireDue: async () => 0,
+  tokenPrefix: (id: string) => id.slice(0, 8),
+};
 
 const outbound = createOutboundService({
   leads,
@@ -129,6 +143,7 @@ const inbound = createInboundService({
   mail,
   ai,
   notify,
+  pendingActions,
 } as unknown as InboundDeps);
 
 describe("uyumluluk e2e", () => {
