@@ -46,6 +46,7 @@ function makeDeps(opts: {
   lead?: Lead | null;
   existsInbound?: boolean;
   vetCountGuess?: number;
+  proposedTime?: { raw: string };
 }) {
   const lead = opts.lead === undefined ? makeLead(opts.segment ?? "mid") : opts.lead;
   return {
@@ -92,6 +93,7 @@ function makeDeps(opts: {
         cls: opts.cls,
         confidence: opts.confidence ?? 0.9,
         vetCountGuess: opts.vetCountGuess,
+        proposedTime: opts.proposedTime,
       }),
       writeDraft: vi.fn().mockResolvedValue({ subject: "Re", body: opts.aiBody ?? "yanıt" }),
     },
@@ -290,5 +292,41 @@ describe("InboundService.handle", () => {
     expect(deps.supp.add).toHaveBeenCalled();
     expect(deps.leads.updateDurum).toHaveBeenCalledWith("1", "cikti");
     expect(deps.mail.createDraft).toHaveBeenCalled();
+  });
+
+  // ADR-0006 §2.4 — substring guardrail
+  it("proposedTime body'de literal substring → korunur, log YOK", async () => {
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({
+      cls: "ilgili",
+      segment: "mid",
+      lead,
+      proposedTime: { raw: "merhaba" },
+    });
+    await run(deps);
+    expect(deps.events.log).not.toHaveBeenCalledWith(
+      "classify_propose_time_hallucination",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("proposedTime body'de YOK (AI uydurma) → drop + halüsinasyon event log", async () => {
+    const lead = makeLead("mid");
+    lead.durum = "demo_istedi";
+    const deps = makeDeps({
+      cls: "ilgili",
+      segment: "mid",
+      lead,
+      proposedTime: { raw: "Salı 14:00" },
+    });
+    // msg.body = "merhaba", "Salı 14:00" yok → drop
+    await run(deps);
+    expect(deps.events.log).toHaveBeenCalledWith(
+      "classify_propose_time_hallucination",
+      null,
+      expect.objectContaining({ raw: "Salı 14:00", cls: "ilgili" }),
+    );
   });
 });

@@ -8,6 +8,14 @@ export const ClassificationSchema = z.object({
   segmentGuess: z.enum(SEGMENTS).optional(),
   /** Mesajdan çıkarılan veteriner sayısı (örn. "4 veteriner çalışıyor" → 4). */
   vetCountGuess: z.number().int().positive().optional(),
+  /**
+   * Müşterinin mesajda LİTERAL geçen gün+saat ifadesi (ADR-0006 §2.4).
+   * AI tarih PARSE etmez — sadece substring alıntılar. Substring guardrail
+   * inbound servisinde tekrar doğrular (hallüsinasyon drop).
+   */
+  proposedTime: z
+    .object({ raw: z.string().min(1).max(80) })
+    .optional(),
 });
 export type ClassificationResult = z.infer<typeof ClassificationSchema>;
 
