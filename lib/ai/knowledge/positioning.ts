@@ -9,4 +9,4 @@ Bu derinlikte (özellikle İK/bordro/vardiya) Türkiye'de vet-özel rakip yok �
 
 Değer önermesi: Kliniğin bugün arka-ofise harcadığını (muhasebeci + bordro hizmeti + sahibin vakti + parçalı yazılım yığını) TEK sistemde toplar; bunun bir fraksiyonuna mal olur.
 
-Hedef: poliklinikler ve hastaneler (kurumsal, çok personelli) için en yüksek değer; solo muayenehaneler için self-servis.`;
+Hedef: poliklinikler ve hastaneler (kurumsal, çok personelli) için en yüksek değer; solo muayenehaneler için de hızlı kurulabilen sade bir çözüm. (Satış demo üzerinden ilerler — "self-servis"/"deneme" ifadeleri kullanılmaz.)`;

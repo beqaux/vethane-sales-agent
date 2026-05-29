@@ -3,6 +3,7 @@ import {
   runGuardrails,
   noPriceForBigSegment,
   noPromises,
+  noBannedPhrasesOrTime,
   requireOptOut,
   suppressionCheck,
 } from "@/lib/guardrails";
@@ -107,6 +108,54 @@ describe("requireOptOut", () => {
   });
 });
 
+describe("noBannedPhrasesOrTime", () => {
+  it("'Tüm sistem — harika' (em-dash) reddeder", () => {
+    expect(noBannedPhrasesOrTime(draft({ body: "Tüm sistem — harika!" }), ctx()).ok).toBe(false);
+  });
+  it("tire/dash varyasyonları da reddedilir", () => {
+    expect(noBannedPhrasesOrTime(draft({ body: "Tüm sistem - harika" }), ctx()).ok).toBe(false);
+    expect(noBannedPhrasesOrTime(draft({ body: "Tüm sistem harika" }), ctx()).ok).toBe(false);
+  });
+  it("'Handaki' gibberish reddeder", () => {
+    expect(noBannedPhrasesOrTime(draft({ body: "Handaki 1-2 veterinerli yapınız" }), ctx()).ok).toBe(false);
+  });
+  it("yapay kalıp ('kliniğinize tam uyumlu olup olmadığını') reddeder", () => {
+    expect(
+      noBannedPhrasesOrTime(draft({ body: "kliniğinize tam uyumlu olup olmadığını görelim" }), ctx()).ok,
+    ).toBe(false);
+  });
+  it("mid_reply'da uydurma somut saat ('Çarşamba 10:00') reddeder", () => {
+    expect(
+      noBannedPhrasesOrTime(draft({ action: "mid_reply", body: "Çarşamba 10:00 uygun mu?" }), ctx()).ok,
+    ).toBe(false);
+    expect(
+      noBannedPhrasesOrTime(draft({ action: "mid_reply", body: "saat 15 demo yapalım" }), ctx()).ok,
+    ).toBe(false);
+  });
+  it("mid_reply sadece müsaitlik SORARSA geçer (saat yok)", () => {
+    expect(
+      noBannedPhrasesOrTime(
+        draft({ action: "mid_reply", body: "Hangi tarihler size uygun, demo gösterelim?" }),
+        ctx(),
+      ).ok,
+    ).toBe(true);
+  });
+  it("demo_reply müşterinin saatini EKO edebilir → engellenmez (HH:MM serbest)", () => {
+    // ADR-0006 §2.4: demo_reply müşterinin önerdiği saati teyiden yazabilir.
+    expect(
+      noBannedPhrasesOrTime(draft({ action: "demo_reply", body: "Pazartesi 15:30 için not aldım." }), ctx()).ok,
+    ).toBe(true);
+  });
+  it("solo_fiyat saat-kuralından etkilenmez (sadece demo/mid/hospital ask)", () => {
+    expect(
+      noBannedPhrasesOrTime(draft({ action: "solo_fiyat", body: "saat 15 civarı uygun" }), ctx()).ok,
+    ).toBe(true);
+  });
+  it("temiz metin geçer", () => {
+    expect(noBannedPhrasesOrTime(draft({ body: "Kısa bir demo ayarlayalım mı?" }), ctx()).ok).toBe(true);
+  });
+});
+
 describe("suppressionCheck", () => {
   it("suppressed → reddeder", () => {
     expect(suppressionCheck(draft(), ctx(true)).ok).toBe(false);
@@ -126,5 +175,12 @@ describe("runGuardrails (pipeline)", () => {
   });
   it("suppression ilk sırada engeller", () => {
     expect(runGuardrails(draft(), ctx(true)).ok).toBe(false);
+  });
+  it("banned phrase içeren taslak zincirde reddedilir", () => {
+    const r = runGuardrails(
+      draft({ segment: "mid", body: `Tüm sistem — harika!\n${BRAND.optOutText}` }),
+      ctx(),
+    );
+    expect(r.ok).toBe(false);
   });
 });

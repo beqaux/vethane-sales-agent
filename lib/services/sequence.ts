@@ -22,9 +22,12 @@ export function onLost(s: SequenceState): SequenceState {
   return { ...s, status: "stopped_replied", nextActionAt: null };
 }
 
-/** Otomatik yanıt (OOO) → X gün ertele, aktif kalsın. */
+/** Otomatik yanıt (OOO) → X gün ertele, aktif kalsın.
+ * status'u AÇIKÇA 'active' yapar: sekans 'completed'/durmuş bir satırda erteleme
+ * yapılırsa dueForSend (status='active' şartı) lead'i hiç almaz ve sıcak lead
+ * sessizce düşerdi. OOO sonrası lead'i yeniden devreye al. */
 export function reschedule(s: SequenceState, days: number, now: Date = new Date()): SequenceState {
-  return { ...s, nextActionAt: addDays(now, days) };
+  return { ...s, status: "active", nextActionAt: addDays(now, days) };
 }
 
 /** Bir dokunuş gönderildikten sonra sıradakini planla; son adımdan sonra tamamla. */

@@ -46,6 +46,7 @@ export const PLAYBOOKS = {
         "(1) Kısa selam. " +
         "(2) Bir cümleyle Vethane'in arka-ofis değerini hatırlat (muhasebe, bordro, vardiya, raporlama tek sistemde). " +
         "(3) Net çağrı: 'Hangi tarihlerde online bir görüşme yapabiliriz, size demo hesabını gösterelim?' " +
+        "ASLA belirli bir gün/saat ÖNERME (örn. 'Çarşamba 10:00 veya Cuma 14:00'). Sadece müsaitliği SOR; saati müşteri yazsın. " +
         "ASLA önceki yanıtlardan özür dileme veya 'fiyat paylaşmışız' diye geri çekme. Mevcut konuşmayı doğal devam ettir. " +
         "Fiyat sorulursa sayı verme; demoya yönlendir.",
     },
@@ -63,6 +64,7 @@ export const PLAYBOOKS = {
         "(1) Kısa selam. " +
         "(2) Bir cümleyle Vethane'in ölçek değeri (çok şube/personel için konsolide arka-ofis). " +
         "(3) Net çağrı: 'Hangi tarihlerde online bir görüşme yapabiliriz, size demo hesabını gösterelim?' " +
+        "ASLA belirli bir gün/saat ÖNERME (örn. 'Çarşamba 10:00 veya Cuma 14:00'). Sadece müsaitliği SOR; saati müşteri yazsın. " +
         "ASLA önceki yanıtlardan özür dileme veya 'fiyat paylaşmışız' diye geri çekme. " +
         "Fiyat sorulursa sayı verme; demoya yönlendir.",
     },
@@ -75,7 +77,7 @@ export const PLAYBOOKS = {
       "O zamanı NOT ALDIM de. ALTERNATİF SUNMA. 'Kurucumuz o gün size demo bağlantısını " +
       "iletecek' diye kapat.\n" +
       "  (2) Müşteri zaman ÖNERMEDİYSE: 'Sizin için uygun gün/saati paylaşır mısınız?' " +
-      "diye SOR. 2-3 sabit slot önerme; bırak müşteri yazsın.\n" +
+      "diye SOR. ASLA belirli gün/saat ÖNERME (örn. 'Çarşamba 10:00 veya Cuma 14:00'); 2-3 sabit slot önerme; bırak müşteri yazsın.\n" +
       "Sayı/fiyat/taahhüt verme. Demo bağlantısı/URL üretmeye çalışma — kurucu gönderecek.",
   },
   cikisReply: {

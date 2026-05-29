@@ -1,8 +1,18 @@
 import type { Segment, KurumTur, Tier } from "../domain/enums";
 
 /**
- * Segment türetme (SPEC §3.1.2 — 2026-05-26 tür-öncelikli güncelleme).
- * Tür ünvanı varsa her zaman önce o; vet sayısı sadece tür içinde refine eder.
+ * Vet sayısı → segment eşiği (kullanıcı kuralı): 1-2 solo, 3-4 mid, 5+ hospital.
+ * Tek kaynak: hem tür-bağımsız fallback hem muayenehane bu eşiği kullanır.
+ */
+function segmentByVetCount(n: number): Segment {
+  if (n >= 5) return "hospital";
+  if (n >= 3) return "mid";
+  return "solo";
+}
+
+/**
+ * Segment türetme (SPEC §3.1.2 — tür-öncelikli; vet eşiği 1-2/3-4/5+).
+ * Tür ünvanı varsa her zaman önce o; vet sayısı tür içinde refine eder.
  */
 export function deriveSegment(
   vetSayisi: number | null | undefined,
@@ -10,16 +20,15 @@ export function deriveSegment(
 ): Segment {
   if (tur === "hastane") return "hospital";
   if (tur === "poliklinik") {
-    return vetSayisi != null && vetSayisi >= 6 ? "hospital" : "mid";
+    // Poliklinik tabanı en az mid (premium ünvan); 5+ vet → hospital.
+    return vetSayisi != null && vetSayisi >= 5 ? "hospital" : "mid";
   }
   if (tur === "muayenehane") {
     if (vetSayisi == null) return "solo";
-    return vetSayisi >= 3 ? "mid" : "solo";
+    return segmentByVetCount(vetSayisi);
   }
   if (vetSayisi != null && vetSayisi > 0) {
-    if (vetSayisi >= 6) return "hospital";
-    if (vetSayisi >= 3) return "mid";
-    return "solo";
+    return segmentByVetCount(vetSayisi);
   }
   return "unknown";
 }

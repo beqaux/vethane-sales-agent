@@ -45,6 +45,12 @@ const clsResult = (
   confidence = 0.9,
 ): ClassificationResult => ({ cls, confidence, segmentGuess });
 
+const clsTime = (cls: Classification, raw: string): ClassificationResult => ({
+  cls,
+  confidence: 0.9,
+  proposedTime: { raw },
+});
+
 describe("playbook — outbound", () => {
   it("mid/hospital outbound FİYAT içermez (includePrice/priceText yok)", () => {
     const mid = playbookFor("mid").buildOutbound(lead("mid"), 0);
@@ -137,15 +143,65 @@ describe("playbook — unknown + fiyat (premium detection)", () => {
     expect(r.notify).toBe(true);
   });
 
-  it("unknown + fiyat + sinyal yok → solo playbook (fiyat verir)", () => {
+  it("unknown + fiyat + sinyal yok → FİYAT VERME, önce vet sayısı sor", () => {
+    // Segment bilinmeden solo fiyatını otomatik göndermek (yanlış fiyat riski) kaldırıldı.
     const l = lead("solo");
     l.segment = "unknown";
     l.kurumAdi = "Pati Vet";
     const r = playbookFor("unknown").buildReply(l, msg, clsResult("fiyat"));
     expect(r.action).toBe("solo_fiyat");
+    expect(r.includePrice).toBeFalsy();
+    expect(r.priceText).toBeUndefined();
+    expect(r.sendDraft).toBe(true);
+    expect(r.notify).toBe(true);
+  });
+
+  it("BİLİNEN solo + fiyat → fiyat hâlâ verilir (sadece unknown deferred)", () => {
+    const r = playbookFor("solo").buildReply(lead("solo"), msg, clsResult("fiyat"));
     expect(r.includePrice).toBe(true);
     expect(r.priceText).toMatch(/₺/);
+  });
+});
+
+// Sonsuz auto-cevap döngüsü guard'ı (durum=cevap_geldi sonrası).
+describe("playbook — cevap_geldi döngü guard", () => {
+  it("cevap_geldi + ilgili → cevap_takip (auto-reply YOK)", () => {
+    const l = lead("mid");
+    l.durum = "cevap_geldi";
+    const r = playbookFor("mid").buildReply(l, msg, clsResult("ilgili"));
+    expect(r.action).toBe("cevap_takip");
+    expect(r.sendDraft).toBe(false);
     expect(r.notify).toBe(true);
+  });
+
+  it("cevap_geldi + fiyat → cevap_takip (tekrar fiyat cevabı üretmez)", () => {
+    const l = lead("mid");
+    l.durum = "cevap_geldi";
+    const r = playbookFor("mid").buildReply(l, msg, clsResult("fiyat"));
+    expect(r.action).toBe("cevap_takip");
+    expect(r.sendDraft).toBe(false);
+  });
+
+  it("cevap_geldi + demo → demo_reply (açık yeni demo isteği auto kalır)", () => {
+    const l = lead("mid");
+    l.durum = "cevap_geldi";
+    const r = playbookFor("mid").buildReply(l, msg, clsResult("demo"));
+    expect(r.action).toBe("demo_reply");
+  });
+
+  it("cevap_geldi + cikis → opt-out işler (cevap_takip değil)", () => {
+    const l = lead("mid");
+    l.durum = "cevap_geldi";
+    const r = playbookFor("mid").buildReply(l, msg, clsResult("cikis"));
+    expect(r.action).toBe("cikis_reply");
+    expect(r.suppress).toBe(true);
+  });
+
+  it("cevap_geldi + somut saat → #3 demo onayı (cevap_takip değil)", () => {
+    const l = lead("mid");
+    l.durum = "cevap_geldi";
+    const r = playbookFor("mid").buildReply(l, msg, clsTime("ilgili", "salı 14:00"));
+    expect(r.action).toBe("demo_followup");
   });
 });
 
@@ -156,5 +212,57 @@ describe("playbook — satis_spami", () => {
     expect(r.notify).toBe(false);
     expect(r.newDurum).toBe("kaybedildi");
     expect(r.stopSequence).toBe(true);
+  });
+});
+
+// ADR-0006 §2.1 akış #3 — somut gün/saat önerisi kurucu onayına gider, auto-confirm YOK.
+describe("playbook — proposedTime routing (#3 demo onayı)", () => {
+  it("demo + somut saat → demo_followup (auto-send YOK) + durum demo_istedi", () => {
+    const r = playbookFor("mid").buildReply(lead("mid"), msg, clsTime("demo", "pazartesi 16:00"));
+    expect(r.action).toBe("demo_followup");
+    expect(r.sendDraft).toBe(false);
+    expect(r.notify).toBe(true);
+    expect(r.newDurum).toBe("demo_istedi");
+  });
+
+  it("fiyat + somut saat (mid) → demo_followup (mid_reply auto-send DEĞİL)", () => {
+    const r = playbookFor("mid").buildReply(lead("mid"), msg, clsTime("fiyat", "salı 15:30"));
+    expect(r.action).toBe("demo_followup");
+    expect(r.sendDraft).toBe(false);
+  });
+
+  it("ilgili + somut saat → demo_followup", () => {
+    const r = playbookFor("solo").buildReply(lead("solo"), msg, clsTime("ilgili", "çarşamba 10:00"));
+    expect(r.action).toBe("demo_followup");
+    expect(r.sendDraft).toBe(false);
+  });
+
+  it("cikis + saat → opt-out kazanır (proposedTime yoksayılır)", () => {
+    const r = playbookFor("mid").buildReply(lead("mid"), msg, clsTime("cikis", "salı 14:00"));
+    expect(r.action).toBe("cikis_reply");
+    expect(r.suppress).toBe(true);
+    expect(r.newDurum).toBe("cikti");
+  });
+
+  it("oto_yanit + saat → HIJACK edilmez (reschedule semantiği korunur)", () => {
+    const r = playbookFor("mid").buildReply(lead("mid"), msg, clsTime("oto_yanit", "pazartesi 09:00"));
+    expect(r.action).not.toBe("demo_followup");
+    expect(r.rescheduleDays).toBeGreaterThan(0);
+  });
+
+  it("terminal durum (kaybedildi/cikti/kazanildi) + saat → lead diriltilmez", () => {
+    for (const durum of ["kaybedildi", "cikti", "kazanildi"] as const) {
+      const l = lead("mid");
+      l.durum = durum;
+      const r = playbookFor("mid").buildReply(l, msg, clsTime("ilgili", "salı 14:00"));
+      expect(r.action).not.toBe("demo_followup");
+    }
+  });
+
+  it("demo + saat YOK → eski demo_reply (auto ask) korunur", () => {
+    const r = playbookFor("mid").buildReply(lead("mid"), msg, clsResult("demo"));
+    expect(r.action).toBe("demo_reply");
+    expect(r.sendDraft).toBe(true);
+    expect(r.newDurum).toBe("demo_istedi");
   });
 });

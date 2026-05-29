@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildSystemPrompt, buildUserPrompt, PRICE_BAN_MARKER } from "@/lib/ai/prompts";
+import { BRAND } from "@/lib/config/runtime";
 import { getKnowledge } from "@/lib/ai/knowledge";
 import type { DraftRequest, Lead } from "@/lib/domain/types";
 import type { Segment } from "@/lib/domain/enums";
@@ -59,8 +60,10 @@ describe("prompt builder — fiyat guardrail (1. katman)", () => {
     expect(s).toContain("Sayı UYDURMA");
   });
 
-  it("cold mail user prompt'unda ilk temas işareti ve opt-out talimatı", () => {
+  it("cold mail user prompt'unda ilk temas işareti; sistem prompt'unda opt-out satırı YOK (tek kaynak: outbound deterministik append)", () => {
     expect(buildUserPrompt(req("mid"))).toContain("İLK temas");
-    expect(buildSystemPrompt(req("mid", { isCold: true }))).toContain("opt-out");
+    // BUG 3 fix: opt-out artık prompt'ta İSTENMEZ (mükerrer satır olmasın diye);
+    // yalnız outbound servisi deterministik ekler. Prompt opt-out metnini içermemeli.
+    expect(buildSystemPrompt(req("mid", { isCold: true }))).not.toContain(BRAND.optOutText);
   });
 });

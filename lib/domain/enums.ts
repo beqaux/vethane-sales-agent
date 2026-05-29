@@ -65,6 +65,7 @@ export const ACTION_TYPES = [
   "hospital_reply",
   "demo_reply",
   "demo_followup",
+  "cevap_takip",
   "cikis_reply",
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];

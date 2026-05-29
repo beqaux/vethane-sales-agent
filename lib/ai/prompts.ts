@@ -17,9 +17,8 @@ export function buildSystemPrompt(req: DraftRequest): string {
     "- İndirim, garanti veya taahhüt VERME.",
     "- ASLA önceki mesajdan özür dileme veya geri çekme ('fiyat paylaşmışız, kusura bakmayın' gibi). Akışı doğal devam ettir.",
   ];
-  if (req.isCold) {
-    parts.push(`- Cold e-posta: gövdenin sonuna opt-out satırı ekle → "${BRAND.optOutText}"`);
-  }
+  // NOT: Cold opt-out satırı AI'a BIRAKILMAZ — outbound servisi deterministik ekler
+  // (lib/services/outbound.ts). Prompt'ta tekrar istemek mükerrer opt-out'a yol açıyordu.
   if (req.segment === "mid" || req.segment === "hospital") {
     parts.push(
       `- ${PRICE_BAN_MARKER}: Bu segmentte değer-satışı yapılır. E-postada KESİNLİKLE fiyat, rakam, ücret veya para birimi (₺ / TL) GEÇMESİN. Fiyat sorulursa 2-adımlı satışa yönlendir: "Klinik büyüklüğüne göre değişiyor; 20 dk'lık bir demoda sistemi göstereyim, teklifi ardından ayrı bir görüşmede sunarım."`,

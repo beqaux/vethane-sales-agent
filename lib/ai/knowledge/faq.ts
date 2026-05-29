@@ -16,4 +16,4 @@ S: SMS ücretli mi?
 C: İletişim modülü Verimor üzerinden çalışır (kendi başlığınız/krediniz); modül ücretsiz.
 
 S: Sözleşme/iptal?
-C: Aylık; yıllık seçenekte indirim. Deneme sürümü var.`;
+C: Aylık veya yıllık ödeme seçeneği mevcut. Kurulum ve tanıtım demo üzerinden ilerler.`;

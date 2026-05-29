@@ -10,7 +10,7 @@ Cevap: O muhtemelen klinik/randevu yazılımı. Vethane arka-ofis (muhasebe/İK/
 Cevap: Kurulumu ve veri taşımayı ilk ay biz elle yapıyoruz; personel eğitimi dahil.
 
 İtiraz: "Küçük bir kliniğiz."
-Cevap: Solo için self-servis deneme var; büyüdükçe modül eklenir.
+Cevap: Vethane solo ölçeğe de uygun; kısa bir demoda nasıl yardımcı olduğunu gösterelim, büyüdükçe modül eklenir. (Self-servis/deneme önerme.)
 
 İtiraz: "Rakip X'i kullanıyoruz."
 Cevap: Çoğu rakipte İK/bordro/vardiya ve gün-sonu/mutabakat yok; asıl fark orada.`;

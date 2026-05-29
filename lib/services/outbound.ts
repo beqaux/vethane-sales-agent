@@ -61,8 +61,13 @@ export function createOutboundService(deps: OutboundDeps) {
         };
 
         const generated = await deps.ai.writeDraft(req);
-        // Opt-out'u DETERMİNİSTİK ekle (AI'a güvenme) — cold ise.
-        const body = spec.isCold ? `${generated.body}\n\n${BRAND.optOutText}` : generated.body;
+        // Opt-out'u DETERMİNİSTİK ekle (AI'a güvenme) — cold ise. Prompt artık opt-out
+        // istemiyor; yine de modelin kendi eklemesine karşı yalnız EKSİKSE ekle ki
+        // mükerrer satır (kullanıcı raporu: opt-out 2 kez) bir daha oluşmasın.
+        const body =
+          spec.isCold && !generated.body.includes(BRAND.optOutText)
+            ? `${generated.body}\n\n${BRAND.optOutText}`
+            : generated.body;
         const draft: OutboundDraft = {
           subject: generated.subject,
           body,

@@ -308,6 +308,19 @@ describe("InboundService.handle", () => {
     expect(deps.mail.createDraft).toHaveBeenCalled();
   });
 
+  it("durum=cevap_geldi + ilgili → cevap_takip: bot susar + kurucuya bildirir (döngü kapanır)", async () => {
+    // Sonsuz auto-cevap döngüsü: cevap_geldi lead'in takip mesajına bot tekrar yanıt üretmez.
+    const lead = makeLead("mid");
+    lead.durum = "cevap_geldi";
+    const deps = makeDeps({ cls: "ilgili", segment: "mid", lead });
+    await run(deps);
+    expect(deps.mail.createDraft).not.toHaveBeenCalled();
+    expect(deps.mail.send).not.toHaveBeenCalled();
+    expect(deps.notify.hot).toHaveBeenCalled();
+    const labels = (deps.notify.hot as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    expect(labels.some((l: string) => l.includes("Müşteri tekrar yazdı"))).toBe(true);
+  });
+
   // ADR-0006 §2.4 — substring guardrail
   it("proposedTime body'de literal substring → korunur, log YOK", async () => {
     const lead = makeLead("mid");
@@ -422,6 +435,41 @@ describe("InboundService.handle", () => {
     await run(deps);
     expect(deps.pendingActions.resolve).toHaveBeenCalledWith("p-1", "cancelled");
     expect(deps.notify.hot).toHaveBeenCalled();
+  });
+
+  // ADR-0006 §2.1 akış #3 — somut saat önerisi auto-confirm DEĞİL, Telegram onayı (Thread A/B regresyonu)
+  it("cls=demo + proposedTime (durum=sekansta) → confirm_demo_time pending, AUTO-SEND yok", async () => {
+    // Thread A: müşteri "olur pazartesi 16da musaitim" → bot doğrudan "not aldım" atıyordu.
+    const deps = makeDeps({
+      cls: "demo",
+      segment: "mid",
+      proposedTime: { raw: "merhaba" }, // msg.body="merhaba" → substring guardrail'ı geçer
+    });
+    await run(deps);
+    expect(deps.pendingActions.create).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "confirm_demo_time", leadId: "1" }),
+    );
+    expect(deps.notify.demoTimeApproval).toHaveBeenCalled();
+    expect(deps.leads.updateDurum).toHaveBeenCalledWith("1", "demo_istedi");
+    // Kritik: bot otomatik onay maili ATMAZ.
+    expect(deps.mail.send).not.toHaveBeenCalled();
+    expect(deps.mail.createDraft).not.toHaveBeenCalled();
+    expect(deps.notify.hot).not.toHaveBeenCalled();
+  });
+
+  it("cls=fiyat (mid) + proposedTime → confirm_demo_time pending, mid_reply auto-send YOK", async () => {
+    // Thread B: müşteri vet sayısı verip "pazartesi 15:30" yazınca mid_reply auto-confirm ediyordu.
+    const deps = makeDeps({
+      cls: "fiyat",
+      segment: "mid",
+      proposedTime: { raw: "merhaba" },
+    });
+    await run(deps);
+    expect(deps.pendingActions.create).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "confirm_demo_time" }),
+    );
+    expect(deps.mail.send).not.toHaveBeenCalled();
+    expect(deps.mail.createDraft).not.toHaveBeenCalled();
   });
 
   // ADR-0006 §2.1 akış #5 — T11

@@ -675,7 +675,7 @@ vercel env add TELEGRAM_WEBHOOK_SECRET preview production
 
 # Telegram setWebhook (production URL ile)
 curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
-  -d "url=https://saas-seller.vercel.app/api/webhooks/telegram" \
+  -d "url=https://vethane-sales-agent.vercel.app/api/webhooks/telegram" \
   -d "secret_token=${TELEGRAM_WEBHOOK_SECRET}" \
   -d "allowed_updates=[\"callback_query\"]"
 ```

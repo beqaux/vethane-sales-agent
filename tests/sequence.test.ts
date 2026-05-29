@@ -50,4 +50,12 @@ describe("sequence state machine", () => {
     expect(r.status).toBe("active");
     expect(r.nextActionAt?.getTime()).toBe(NOW.getTime() + 3 * 86_400_000);
   });
+
+  it("reschedule → tamamlanmış/durmuş sekansı YENİDEN AKTİFLER (parked-lead fix)", () => {
+    // OOO, sekans completed olduktan sonra gelirse: status active'e çekilmeli ki
+    // dueForSend (status='active' şartı) lead'i alabilsin; aksi halde sessizce düşerdi.
+    const r = reschedule(seq({ status: "completed", nextActionAt: null }), 3, NOW);
+    expect(r.status).toBe("active");
+    expect(r.nextActionAt?.getTime()).toBe(NOW.getTime() + 3 * 86_400_000);
+  });
 });

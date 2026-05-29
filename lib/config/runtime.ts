@@ -25,6 +25,9 @@ export const ACTION_MODES: Record<ActionType, "manual" | "auto"> = {
   hospital_reply: "auto",
   // Demo onayı SONRASI takip ("teşekkürler", "OK" gibi): bot karışmaz, kurucu görür.
   demo_followup: "manual",
+  // cevap_geldi sonrası düşük-sinyalli takipler: bot otomatik döngüye girmez,
+  // kurucu görür (sonsuz auto-cevap döngüsü fix'i).
+  cevap_takip: "manual",
   // Cold premium: manuel + Telegram button (ADR-0006 §2.2). İlk temas asimetrik
   // (250 hayal hesabından biri yanarsa kalıcı) — kurucu onayı korunur.
   mid_cold: "manual",
@@ -39,7 +42,7 @@ export const ACTION_MODES: Record<ActionType, "manual" | "auto"> = {
 export const BRAND = {
   senderName: process.env.SENDER_NAME ?? "Vethane",
   senderEmail: process.env.SENDER_EMAIL ?? "info@vethane.com",
-  optOutText: "Bu e-postaları almak istemiyorsanız bu mesaja 'çık' yazarak yanıtlamanız yeterli.",
+  optOutText: "Bu e-postaları almak istemiyorsanız, bu e-postaya 'çık' yazarak yanıt vermeniz yeterli.",
 };
 
 // Yükleme-anı doğrulama.

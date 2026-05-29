@@ -3,16 +3,24 @@ import type { Guardrail } from "./types";
 import { suppressionCheck } from "./suppressionCheck";
 import { noPriceForBigSegment } from "./noPriceForBigSegment";
 import { noPromises } from "./noPromises";
+import { noBannedPhrasesOrTime } from "./noBannedPhrasesOrTime";
 import { requireOptOut } from "./requireOptOut";
 
 export type { Guardrail };
-export { suppressionCheck, noPriceForBigSegment, noPromises, requireOptOut };
+export {
+  suppressionCheck,
+  noPriceForBigSegment,
+  noPromises,
+  noBannedPhrasesOrTime,
+  requireOptOut,
+};
 
 // Chain of Responsibility (IMPL §2.3): ilk ret'te durur.
 export const guardrails: Guardrail[] = [
   suppressionCheck,
   noPriceForBigSegment,
   noPromises,
+  noBannedPhrasesOrTime,
   requireOptOut,
 ];
 

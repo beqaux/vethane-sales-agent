@@ -58,6 +58,10 @@ function notifyLabel(opts: {
   if (opts.action === "demo_followup") {
     return `${prefix}💬 Demo sonrası mesaj — kurucu takip etsin`;
   }
+  // cevap_geldi sonrası tekrar yazan müşteri — bot susar, kurucu yanıtlar.
+  if (opts.action === "cevap_takip") {
+    return `${prefix}💬 Müşteri tekrar yazdı — kurucu yanıtlasın`;
+  }
   if (opts.cls === "demo") return `${prefix}🔥 DEMO İSTEĞİ`;
   if (opts.segment === "mid" || opts.segment === "hospital") {
     return `${prefix}🔥 Premium yanıt (${opts.segment})`;
@@ -73,17 +77,9 @@ function notifyLabel(opts: {
 
 export function createInboundService(deps: InboundDeps) {
   async function handleMessage(msg: InboundMessage): Promise<void> {
-    if (await deps.msgs.existsInbound(msg.gmailMessageId)) return; // dedup
+    if (await deps.msgs.existsInbound(msg.gmailMessageId)) return; // hızlı early-out
 
-    const cls = await deps.ai.classify(msg);
-    // ADR-0006 §2.4: substring guardrail — AI uydurma proposedTime drop.
-    if (cls.proposedTime && !msg.body.includes(cls.proposedTime.raw)) {
-      await deps.events.log("classify_propose_time_hallucination", null, {
-        raw: cls.proposedTime.raw,
-        cls: cls.cls,
-      });
-      cls.proposedTime = undefined;
-    }
+    // Lead'i classify'den ÖNCE çöz: dedup claim FK için leadId ister.
     let lead =
       (msg.threadId ? await deps.leads.byThread(msg.threadId) : null) ??
       (await deps.leads.byEmail(msg.fromEmail));
@@ -113,23 +109,38 @@ export function createInboundService(deps: InboundDeps) {
           durum: "yeni",
           kaynak: "inbound",
         });
-        await deps.events.log("inbound_new_lead", lead.id, { from: msg.fromEmail, cls: cls.cls });
+        await deps.events.log("inbound_new_lead", lead.id, { from: msg.fromEmail });
         isNewLead = true;
       }
     }
 
+    // Dedup CLAIM'i SLOW classify'den ÖNCE commit et. İki eşzamanlı invocation
+    // (Pub/Sub at-least-once duplicate push + poll-sent cron) classify'a hiç girmeden
+    // burada elenir — eski sırada loser ~2-3s'lik classify + draft'ı boşuna koşuyordu.
+    // classification claim anında bilinmiyor → null (informational kolon, geri okunmuyor).
+    // NOT: Bu, çift gönderimin ASIL çözümü olan partial-unique-index'in (uniq_inbound_gmail_msg,
+    // migration 0003) prod DB'ye uygulanmış olmasını gerektirir; index yoksa ON CONFLICT
+    // bir şey yutmaz. Sırayı öne almak pencereyi daraltır + mükerrer LLM maliyetini keser.
     const inserted = await deps.msgs.add({
       leadId: lead.id,
       direction: "in",
       gmailMessageId: msg.gmailMessageId,
       subject: msg.subject,
       body: msg.body,
-      classification: cls.cls,
+      classification: null,
       status: null,
     });
-    // null → partial unique index ON CONFLICT yuttu (Pub/Sub at-least-once duplicate).
-    // İkinci flow buradan sonrasını çalıştırmamalı: bildirim/draft tek kez gitsin.
     if (!inserted) return;
+
+    const cls = await deps.ai.classify(msg);
+    // ADR-0006 §2.4: substring guardrail — AI uydurma proposedTime drop.
+    if (cls.proposedTime && !msg.body.includes(cls.proposedTime.raw)) {
+      await deps.events.log("classify_propose_time_hallucination", null, {
+        raw: cls.proposedTime.raw,
+        cls: cls.cls,
+      });
+      cls.proposedTime = undefined;
+    }
 
     // Mesajda vet sayısı bildirildiyse lead'i güncelle ve segmenti yeniden hesapla.
     // Aksi takdirde ilk yaratıldığı segment'te (örn. solo) kilitli kalır.
@@ -166,7 +177,16 @@ export function createInboundService(deps: InboundDeps) {
     // yine info notify atılır.
     const willTryUncertainButton =
       cls.confidence < CONF_THRESHOLD && plan.sendDraft;
-    if (cls.confidence < CONF_THRESHOLD && !plan.sendDraft) {
+    // Düşük güven + taslak yok: aşağıdaki ANA bildirim (plan.notify ya da yeni lead)
+    // zaten atılacaksa ikinci bir "Belirsiz" pingi atma (mükerrer bildirim engeli —
+    // örn. demo_followup / cevap_takip notify:true). Sadece aksi halde sessiz kalacak
+    // terminal sınıflar (ilgisiz/satis_spami, mevcut lead) için tek bilgi notify'ı at.
+    if (
+      cls.confidence < CONF_THRESHOLD &&
+      !plan.sendDraft &&
+      !plan.notify &&
+      !isNewLead
+    ) {
       await deps.notify.hot("❓ Belirsiz cevap — elle bak", lead, msg, { cls });
     }
 
@@ -244,11 +264,20 @@ export function createInboundService(deps: InboundDeps) {
         premiumMatch,
         action: plan.action,
       });
+      // Bildirim etiketine GERÇEK durum eklenir: bot otomatik yanıt attıysa kurucu
+      // boşuna "manuel kontrol" sanmasın; taslak/onay gerekiyorsa belli olsun.
+      const willAutoSend =
+        plan.sendDraft &&
+        ACTION_MODES[plan.action] === "auto" &&
+        cls.confidence >= CONF_THRESHOLD;
+      const disposition = willAutoSend
+        ? " · ✅ otomatik yanıtlandı"
+        : " · ✋ kurucu yanıtlasın";
       const enrich: NotifyEnrichment = {
         cls,
         premiumMatch: segment === "unknown" ? premiumMatch : undefined,
       };
-      await deps.notify.hot(label, lead, msg, enrich);
+      await deps.notify.hot(`${label}${disposition}`, lead, msg, enrich);
     }
 
     if (plan.sendDraft) {

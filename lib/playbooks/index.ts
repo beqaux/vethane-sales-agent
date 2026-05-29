@@ -142,6 +142,36 @@ function buildReplyFor(
   msg: InboundMessage,
   cls: ClassificationResult,
 ): ReplyPlan {
+  // ADR-0006 §2.1 akış #3: Müşteri SOMUT bir gün+saat önerdiyse (proposedTime),
+  // randevu onayı KURUCU kontrolünden geçmeli — bot ASLA auto-confirm etmez.
+  // Bu kontrol commonReply'ın cls=demo (demo_reply, auto) yolundan ve aşağıdaki
+  // mid_reply/solo_* (auto) yollarından ÖNCE çalışır; aksi halde saat önerileri
+  // sessizce otomatik onaylanıyordu (kullanıcı raporu: "tarih verince randevu
+  // doğrudan kabul edildi, Telegram onayı gelmedi").
+  // Kapsam dar tutulur (red-team):
+  //  - Yalnız engagement cls'leri (demo/fiyat/ilgili). cikis/ilgisiz/oto_yanit/
+  //    satis_spami commonReply semantiğini korur (opt-out/ertele/kaybedildi);
+  //    içinde saat string'i geçen OOO/ret mailleri hijack edilmez.
+  //  - kaybedildi/cikti/kazanildi → ölü/çıkmış/kazanılmış lead diriltilmez (E5/E6).
+  const proposedTimeEligible =
+    (cls.cls === "demo" || cls.cls === "fiyat" || cls.cls === "ilgili") &&
+    lead.durum !== "kaybedildi" &&
+    lead.durum !== "cikti" &&
+    lead.durum !== "kazanildi";
+  if (proposedTimeEligible && cls.proposedTime && cls.proposedTime.raw.length > 0) {
+    return {
+      action: "demo_followup",
+      goal: "Müşteri somut gün/saat önerdi — kurucu Telegram'dan onaylasın, bot auto-confirm etmez.",
+      guidance: "",
+      sendDraft: false,
+      notify: true,
+      stopSequence: true,
+      suppress: false,
+      // Zaten demo_istedi ise gereksiz yazma yapma; değilse demo state'ine al.
+      newDurum: lead.durum === "demo_istedi" ? undefined : "demo_istedi",
+    };
+  }
+
   const common = commonReply(cls.cls);
   if (common) return common;
 
@@ -153,6 +183,23 @@ function buildReplyFor(
     return {
       action: "demo_followup",
       goal: "Demo onayı sonrası takip — bot mesaj atmaz, kurucu Telegram'dan görür.",
+      guidance: "",
+      sendDraft: false,
+      notify: true,
+      stopSequence: true,
+      suppress: false,
+    };
+  }
+
+  // Sonsuz auto-cevap döngüsü fix'i: lead'e zaten bir kez cevap verdik (durum=cevap_geldi).
+  // Bundan sonraki düşük-sinyalli takipler (fiyat/ilgili) için bot tekrar tekrar AI
+  // cevabı ÜRETMEZ — kurucuya bildirir, bot susar. (Açık yeni demo isteği commonReply'da
+  // demo_reply'a; somut gün/saat yukarıdaki #3 onayına gider — ikisi de buraya düşmez.)
+  // Bu, prod'da görülen "tek mesaja arka arkaya otomatik yanıtlar" döngüsünü kapatır.
+  if (lead.durum === "cevap_geldi") {
+    return {
+      action: "cevap_takip",
+      goal: "Müşteri tekrar yazdı — bot otomatik cevap döngüsüne girmez, kurucu takip eder.",
       guidance: "",
       sendDraft: false,
       notify: true,
@@ -176,17 +223,24 @@ function buildReplyFor(
         newDurum: "cevap_geldi",
       };
     }
+    // Segment HENÜZ bilinmiyor (unknown) + premium sinyali yok → SOLO fiyatını
+    // OTOMATİK göndermek riskli: lead gerçekte poliklinik/hastane olabilir ve yanlış
+    // (solo) fiyat gider. Önce vet sayısını SOR (rakam verme); cevap gelince segment
+    // netleşir, doğru fiyat/akış tetiklenir. (Bilinen solo lead'ler bu daldan geçmez,
+    // aşağıdaki segment==="solo" dalında fiyatı normal alır.)
     return {
       action: "solo_fiyat",
-      goal: PLAYBOOKS.solo.fiyatReply.goal,
-      guidance: PLAYBOOKS.solo.fiyatReply.guidance,
+      goal: "Segment bilinmiyor — fiyat vermeden önce veteriner sayısını sor.",
+      guidance:
+        "Fiyat klinik büyüklüğüne (veteriner sayısına) göre değişir. KESİNLİKLE rakam/fiyat/para birimi YAZMA. " +
+        "Tek net soru sor: 'Doğru fiyatlandırma için klinikte kaç veteriner ile çalıştığınızı öğrenebilir miyim?' " +
+        "Kısa ve nazik ol; başka bilgi veya örnek ekleme.",
       sendDraft: true,
       notify: true,
       stopSequence: true,
       suppress: false,
       newDurum: "cevap_geldi",
-      includePrice: true,
-      priceText: soloPriceText(lead),
+      // includePrice/priceText YOK → unknown lead'e fiyat sızmaz.
     };
   }
 

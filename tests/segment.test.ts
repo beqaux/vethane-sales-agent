@@ -31,11 +31,24 @@ describe("deriveSegment", () => {
   it("muayenehane + null vet → solo", () => {
     expect(deriveSegment(null, "muayenehane")).toBe("solo");
   });
-  it("poliklinik + 5 vet → mid", () => {
-    expect(deriveSegment(5, "poliklinik")).toBe("mid");
+  it("poliklinik + 4 vet → mid (taban mid)", () => {
+    expect(deriveSegment(4, "poliklinik")).toBe("mid");
   });
-  it("poliklinik + 6 vet → hospital", () => {
-    expect(deriveSegment(6, "poliklinik")).toBe("hospital");
+  it("poliklinik + 5 vet → hospital", () => {
+    expect(deriveSegment(5, "poliklinik")).toBe("hospital");
+  });
+
+  // Kullanıcı eşiği: 1-2 solo, 3-4 mid, 5+ hospital (tür yoksa / muayenehane)
+  it("vet eşiği 1-2/3-4/5+ → solo/mid/hospital", () => {
+    expect(deriveSegment(1, null)).toBe("solo");
+    expect(deriveSegment(2, null)).toBe("solo");
+    expect(deriveSegment(3, null)).toBe("mid");
+    expect(deriveSegment(4, null)).toBe("mid");
+    expect(deriveSegment(5, null)).toBe("hospital");
+    expect(deriveSegment(10, null)).toBe("hospital");
+    // muayenehane de aynı eşiği izler
+    expect(deriveSegment(4, "muayenehane")).toBe("mid");
+    expect(deriveSegment(5, "muayenehane")).toBe("hospital");
   });
 });
 
